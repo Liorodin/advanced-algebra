@@ -6,29 +6,16 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   return (
-    <div style={{
-      minHeight: '100vh',
-      backgroundColor: '#f8fafc',
-      fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
-    }}>
-      <header style={{
-        backgroundColor: '#1e293b',
-        color: '#f1f5f9',
-        padding: '16px 24px',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-      }}>
-        <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600 }}>
+    <div className="min-h-screen bg-slate-50 font-sans">
+      <header className="bg-slate-800 text-slate-100 px-6 py-4 shadow-sm">
+        <h1 className="m-0 text-2xl font-semibold">
           BLS Signature Scheme
         </h1>
-        <p style={{ margin: '4px 0 0', fontSize: '0.875rem', color: '#94a3b8' }}>
+        <p className="mt-1 mb-0 text-sm text-slate-400">
           Reduced Tate Pairing &mdash; Advanced Algebra &amp; Applications in Cryptography
         </p>
       </header>
-      <main style={{
-        maxWidth: '960px',
-        margin: '24px auto',
-        padding: '0 24px',
-      }}>
+      <main className="max-w-[960px] mx-auto my-6 px-6">
         {children}
       </main>
     </div>

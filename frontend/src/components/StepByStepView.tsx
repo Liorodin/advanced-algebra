@@ -60,53 +60,29 @@ export function StepByStepView({ result }: StepByStepViewProps) {
   const toggle = (i: number) => setOpenIndex(openIndex === i ? null : i);
 
   return (
-    <div style={{
-      backgroundColor: '#ffffff',
-      padding: '24px',
-      borderRadius: '12px',
-      border: '1px solid #e2e8f0',
-    }}>
-      <h2 style={{ marginTop: 0, fontSize: '1.1rem', color: '#1e293b' }}>
+    <div className="bg-white p-6 rounded-xl border border-slate-200">
+      <h2 className="mt-0 text-lg text-slate-800">
         Step-by-Step Computation
       </h2>
       {sections.map((section, i) => (
-        <div key={i} style={{
-          border: '1px solid #e2e8f0',
-          borderRadius: '8px',
-          marginBottom: '8px',
-          overflow: 'hidden',
-        }}>
+        <div key={i} className="border border-slate-200 rounded-lg mb-2 overflow-hidden">
           <button
             onClick={() => toggle(i)}
-            style={{
-              width: '100%',
-              padding: '12px 16px',
-              background: openIndex === i ? '#f1f5f9' : '#ffffff',
-              border: 'none',
-              cursor: 'pointer',
-              textAlign: 'left',
-              fontSize: '0.95rem',
-              fontWeight: 600,
-              color: '#334155',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
+            className={`w-full px-4 py-3 border-none cursor-pointer text-left text-[0.95rem] font-semibold text-slate-700 flex justify-between items-center ${
+              openIndex === i ? 'bg-slate-100' : 'bg-white'
+            }`}
           >
             {section.title}
-            <span style={{ fontSize: '0.75rem' }}>{openIndex === i ? '▲' : '▼'}</span>
+            <span className="text-xs">{openIndex === i ? '▲' : '▼'}</span>
           </button>
           {openIndex === i && (
-            <div style={{ padding: '12px 16px', borderTop: '1px solid #e2e8f0' }}>
+            <div className="px-4 py-3 border-t border-slate-200">
               {section.items.map((item, j) => (
-                <div key={j} style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  padding: '6px 0',
-                  borderBottom: j < section.items.length - 1 ? '1px solid #f1f5f9' : 'none',
-                }}>
-                  <span style={{ color: '#64748b', fontSize: '0.875rem' }}>{item.label}</span>
-                  <span style={{ fontFamily: 'monospace', color: '#1e293b', fontSize: '0.875rem' }}>
+                <div key={j} className={`flex justify-between py-1.5 ${
+                  j < section.items.length - 1 ? 'border-b border-slate-100' : ''
+                }`}>
+                  <span className="text-slate-500 text-sm">{item.label}</span>
+                  <span className="font-mono text-slate-800 text-sm">
                     {item.value}
                   </span>
                 </div>

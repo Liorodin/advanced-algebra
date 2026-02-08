@@ -6,38 +6,27 @@ interface ResultsDisplayProps {
 
 export function ResultsDisplay({ result }: ResultsDisplayProps) {
   return (
-    <div style={{
-      backgroundColor: '#ffffff',
-      padding: '24px',
-      borderRadius: '12px',
-      border: '1px solid #e2e8f0',
-      marginBottom: '24px',
-    }}>
-      <h2 style={{ marginTop: 0, fontSize: '1.1rem', color: '#1e293b' }}>
+    <div className="bg-white p-6 rounded-xl border border-slate-200 mb-6">
+      <h2 className="mt-0 text-lg text-slate-800">
         Results
       </h2>
 
-      <div style={{
-        padding: '16px',
-        borderRadius: '8px',
-        backgroundColor: result.verified ? '#f0fdf4' : '#fef2f2',
-        border: `1px solid ${result.verified ? '#bbf7d0' : '#fecaca'}`,
-        marginBottom: '16px',
-      }}>
-        <p style={{
-          margin: 0,
-          fontWeight: 600,
-          color: result.verified ? '#166534' : '#991b1b',
-          fontSize: '1rem',
-        }}>
+      <div className={`p-4 rounded-lg mb-4 border ${
+        result.verified
+          ? 'bg-green-50 border-green-200'
+          : 'bg-red-50 border-red-200'
+      }`}>
+        <p className={`m-0 font-semibold text-base ${
+          result.verified ? 'text-green-800' : 'text-red-800'
+        }`}>
           {result.verified ? 'Signature Verified' : 'Verification Failed'}
         </p>
-        <p style={{ margin: '8px 0 0', color: '#374151' }}>
+        <p className="mt-2 mb-0 text-gray-700">
           {result.display_message}
         </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+      <div className="grid grid-cols-2 gap-3">
         <InfoCard label="Signature" value={`(${result.signature.x}, ${result.signature.y})`} />
         <InfoCard label="H(m)" value={`(${result.hash_point.x}, ${result.hash_point.y})`} />
         <InfoCard label="e_r(sig, Q)" value={result.pairing_lhs} />
@@ -49,16 +38,11 @@ export function ResultsDisplay({ result }: ResultsDisplayProps) {
 
 function InfoCard({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{
-      padding: '12px',
-      backgroundColor: '#f8fafc',
-      borderRadius: '6px',
-      border: '1px solid #e2e8f0',
-    }}>
-      <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, marginBottom: '4px' }}>
+    <div className="p-3 bg-slate-50 rounded-md border border-slate-200">
+      <div className="text-xs text-slate-500 font-semibold mb-1">
         {label}
       </div>
-      <div style={{ fontSize: '0.95rem', color: '#1e293b', fontFamily: 'monospace', wordBreak: 'break-all' }}>
+      <div className="text-[0.95rem] text-slate-800 font-mono break-all">
         {value}
       </div>
     </div>

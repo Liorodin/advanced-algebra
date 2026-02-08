@@ -5,18 +5,7 @@ interface ErrorAlertProps {
 
 export function ErrorAlert({ message, onDismiss }: ErrorAlertProps) {
   return (
-    <div style={{
-      padding: '12px 16px',
-      marginBottom: '16px',
-      backgroundColor: '#fef2f2',
-      border: '1px solid #fecaca',
-      borderRadius: '8px',
-      color: '#991b1b',
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'flex-start',
-      gap: '12px',
-    }}>
+    <div className="px-4 py-3 mb-4 bg-red-50 border border-red-200 rounded-lg text-red-800 flex justify-between items-start gap-3">
       <div>
         <strong>Error: </strong>
         <span>{message}</span>
@@ -24,14 +13,7 @@ export function ErrorAlert({ message, onDismiss }: ErrorAlertProps) {
       {onDismiss && (
         <button
           onClick={onDismiss}
-          style={{
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            color: '#991b1b',
-            fontSize: '18px',
-            lineHeight: 1,
-          }}
+          className="bg-transparent border-none cursor-pointer text-red-800 text-lg leading-none"
         >
           &times;
         </button>
