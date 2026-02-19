@@ -31,9 +31,11 @@ class PrimeField:
         Raises:
             ValueError: If p is not prime or p ≢ 3 (mod 4).
         """
-        raise NotImplementedError(
-            "PrimeField.__init__: Validate p is prime and p ≡ 3 (mod 4), then store p"
-        )
+        if not is_prime(p):
+            raise ValueError("p must be prime")
+        if p % 4 != 3:
+            raise ValueError("p must satisfy p ≡ 3 (mod 4)")
+        self.p = p
 
     def element(self, value: int) -> FieldElement:
         """Create a FieldElement in this field.
@@ -52,7 +54,7 @@ class PrimeField:
             >>> a = F.element(5)
             >>> b = F.element(110)  # same as F.element(7) since 110 mod 103 = 7
         """
-        raise NotImplementedError("PrimeField.element: Return FieldElement(value, self)")
+        return FieldElement(value % self.p, self)
 
     def order(self) -> int:
         """Return the order (size) of the field.
@@ -60,7 +62,7 @@ class PrimeField:
         Returns:
             The prime p (the field has p elements).
         """
-        raise NotImplementedError("PrimeField.order: Return self.p")
+        return self.p
 
     def __repr__(self) -> str:
         return f"F_{self.p}"
@@ -86,9 +88,8 @@ class FieldElement:
             value: Integer value (will be reduced mod p).
             field: The PrimeField this element belongs to.
         """
-        raise NotImplementedError(
-            "FieldElement.__init__: Store value % field.p and reference to field"
-        )
+        self.value = value % field.p
+        self.field = field
 
     def __add__(self, other: FieldElement) -> FieldElement:
         """Add two field elements: (a + b) mod p.
@@ -102,7 +103,9 @@ class FieldElement:
         Raises:
             ValueError: If elements are from different fields.
         """
-        raise NotImplementedError("FieldElement.__add__: Return (self.value + other.value) mod p")
+        if self.field != other.field:
+            raise ValueError("Elements must be from the same field")
+        return FieldElement((self.value + other.value), self.field)
 
     def __sub__(self, other: FieldElement) -> FieldElement:
         """Subtract two field elements: (a - b) mod p.
@@ -113,7 +116,9 @@ class FieldElement:
         Returns:
             New FieldElement representing the difference.
         """
-        raise NotImplementedError("FieldElement.__sub__: Return (self.value - other.value) mod p")
+        if self.field != other.field:
+            raise ValueError("Elements must be from the same field")
+        return FieldElement((self.value - other.value), self.field)
 
     def __mul__(self, other: FieldElement) -> FieldElement:
         """Multiply two field elements: (a * b) mod p.
@@ -124,7 +129,9 @@ class FieldElement:
         Returns:
             New FieldElement representing the product.
         """
-        raise NotImplementedError("FieldElement.__mul__: Return (self.value * other.value) mod p")
+        if self.field != other.field:
+            raise ValueError("Elements must be from the same field")
+        return FieldElement((self.value * other.value), self.field)
 
     def __truediv__(self, other: FieldElement) -> FieldElement:
         """Divide two field elements: a * b^{-1} mod p.
@@ -138,7 +145,9 @@ class FieldElement:
         Raises:
             ZeroDivisionError: If other is zero.
         """
-        raise NotImplementedError("FieldElement.__truediv__: Return self * other.inverse()")
+        if self.field != other.field:
+            raise ValueError("Elements must be from the same field")
+        return self * other.inverse()
 
     def __neg__(self) -> FieldElement:
         """Negate: return (-a) mod p.
@@ -146,7 +155,7 @@ class FieldElement:
         Returns:
             New FieldElement representing the additive inverse.
         """
-        raise NotImplementedError("FieldElement.__neg__: Return (-self.value) mod p")
+        return FieldElement(-self.value, self.field)
 
     def __pow__(self, exp: int) -> FieldElement:
         """Exponentiation using square-and-multiply (binary method).
@@ -163,9 +172,20 @@ class FieldElement:
         Returns:
             New FieldElement representing a^exp mod p.
         """
-        raise NotImplementedError(
-            "FieldElement.__pow__: Implement square-and-multiply for a^exp mod p"
-        )
+        if exp < 0:
+            inv = self.inverse()
+            return inv ** (-exp)
+
+        result = FieldElement(1, self.field)
+        base = FieldElement(self.value, self.field)
+
+        while exp > 0:
+            if exp & 1:
+                result = result * base
+            base = base * base
+            exp >>= 1
+
+        return result
 
     def __eq__(self, other: object) -> bool:
         """Check equality of two field elements.
@@ -179,14 +199,16 @@ class FieldElement:
         Returns:
             True if equal, False otherwise.
         """
-        raise NotImplementedError("FieldElement.__eq__: Compare value and field")
+        if not isinstance(other, FieldElement):
+            return False
+        return self.value == other.value and self.field == other.field
 
     def __hash__(self) -> int:
         """Hash based on value and field prime."""
-        raise NotImplementedError("FieldElement.__hash__: Hash (self.value, self.field.p)")
+        return hash((self.value, self.field.p))
 
     def __repr__(self) -> str:
-        raise NotImplementedError("FieldElement.__repr__: Return str(self.value)")
+        return str(self.value)
 
     def inverse(self) -> FieldElement:
         """Compute multiplicative inverse using extended Euclidean algorithm.
@@ -200,9 +222,10 @@ class FieldElement:
         Raises:
             ZeroDivisionError: If self.value is 0.
         """
-        raise NotImplementedError(
-            "FieldElement.inverse: Use extended_gcd(value, p) to find modular inverse"
-        )
+        g, x, _ = extended_gcd(self.value, self.field.p)
+        if g != 1:
+            raise ZeroDivisionError("Element is not invertible")
+        return FieldElement(x % self.field.p, self.field)
 
     def is_quadratic_residue(self) -> bool:
         """Test if this element is a quadratic residue mod p (Euler's criterion).
@@ -215,9 +238,7 @@ class FieldElement:
 
         Used by hash_to_point to check if a candidate x gives a valid curve point.
         """
-        raise NotImplementedError(
-            "FieldElement.is_quadratic_residue: Compute a^((p-1)/2) and check if ≡ 1"
-        )
+        return pow(self.value, (self.field.p - 1) // 2, self.field.p) == 1
 
     def sqrt(self) -> FieldElement:
         """Compute square root for p ≡ 3 (mod 4).
@@ -231,6 +252,6 @@ class FieldElement:
         Raises:
             ValueError: If self is not a quadratic residue.
         """
-        raise NotImplementedError(
-            "FieldElement.sqrt: Return self ** ((p+1)//4) after checking QR"
-        )
+        if not self.is_quadratic_residue():
+            raise ValueError("Element is not a quadratic residue")
+        return FieldElement(pow(self.value, (self.field.p + 1) // 4, self.field.p), self.field)
