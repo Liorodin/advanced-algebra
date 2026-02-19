@@ -21,7 +21,9 @@ def gcd(a: int, b: int) -> int:
         >>> gcd(17, 5)
         1
     """
-    raise NotImplementedError("gcd: Implement Euclid's algorithm")
+    while b != 0:
+        a, b = b, a % b
+    return abs(a)
 
 
 def extended_gcd(a: int, b: int) -> tuple[int, int, int]:
@@ -42,7 +44,18 @@ def extended_gcd(a: int, b: int) -> tuple[int, int, int]:
         >>> extended_gcd(35, 15)
         (5, 1, -2)
     """
-    raise NotImplementedError("extended_gcd: Implement the extended Euclidean algorithm")
+    old_r, r = a, b
+    old_x, x = 1, 0
+    old_y, y = 0, 1
+
+    while r != 0:
+        q = old_r // r
+
+        old_r, r = r, old_r - q * r
+        old_x, x = x, old_x - q * x
+        old_y, y = y, old_y - q * y
+
+    return old_r, old_x, old_y
 
 
 def is_prime(n: int) -> bool:
@@ -63,7 +76,20 @@ def is_prime(n: int) -> bool:
         >>> is_prime(104)
         False
     """
-    raise NotImplementedError("is_prime: Implement primality test (trial division is fine)")
+    if n <= 1:
+        return False
+    if n <= 3:
+        return True
+    if n % 2 == 0 or n % 3 == 0:
+        return False
+
+    i = 5
+    while i * i <= n:
+        if n % i == 0 or n % (i + 2) == 0:
+            return False
+        i += 6
+
+    return True
 
 
 def prime_factors(n: int) -> list[int]:
@@ -84,7 +110,25 @@ def prime_factors(n: int) -> list[int]:
         >>> prime_factors(13)
         [13]
     """
-    raise NotImplementedError("prime_factors: Implement trial division factorization")
+    factors = []
+
+    if n % 2 == 0:
+        factors.append(2)
+        while n % 2 == 0:
+            n //= 2
+
+    i = 3
+    while i * i <= n:
+        if n % i == 0:
+            factors.append(i)
+            while n % i == 0:
+                n //= i
+        i += 2
+
+    if n > 1:
+        factors.append(n)
+
+    return factors
 
 
 def largest_prime_factor(n: int) -> int:
@@ -104,4 +148,6 @@ def largest_prime_factor(n: int) -> int:
         >>> largest_prime_factor(104)
         13
     """
-    raise NotImplementedError("largest_prime_factor: Use prime_factors and return max")
+    if n <= 1:
+        raise ValueError("n must be greater than 1")
+    return max(prime_factors(n))
