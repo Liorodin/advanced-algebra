@@ -10,6 +10,7 @@ Used primarily for:
 """
 
 from __future__ import annotations
+from itertools import zip_longest
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -42,9 +43,12 @@ class Polynomial:
             >>> # Represents 1 + 0*x + 1*x² = x² + 1
             >>> p = Polynomial([F.element(1), F.element(0), F.element(1)], F)
         """
-        raise NotImplementedError(
-            "Polynomial.__init__: Store coefficients (strip trailing zeros) and field"
-        )
+        self.field = field
+        self.p = coefficients
+        self.null = Polynomial([], field)
+
+        while len(self.p) > 0 and self.p[-1] == 0:
+            self.p.pop()
 
     def degree(self) -> int:
         """Return the degree of this polynomial.
@@ -54,7 +58,7 @@ class Polynomial:
         Returns:
             Integer degree, or -1 for the zero polynomial.
         """
-        raise NotImplementedError("Polynomial.degree: Return len(coeffs) - 1, or -1 if empty")
+        return len(self.p) - 1
 
     def is_monic(self) -> bool:
         """Check if the leading coefficient is 1.
@@ -62,7 +66,7 @@ class Polynomial:
         Returns:
             True if the polynomial is monic (leading coeff = 1).
         """
-        raise NotImplementedError("Polynomial.is_monic: Check if leading coefficient == 1")
+        return self.p and self.p[-1] == 1
 
     def __add__(self, other: Polynomial) -> Polynomial:
         """Add two polynomials coefficient-wise.
@@ -73,7 +77,10 @@ class Polynomial:
         Returns:
             New Polynomial representing the sum.
         """
-        raise NotImplementedError("Polynomial.__add__: Add coefficients at each degree")
+        if self.field != other.field:
+            raise ValueError("Polynomials must be from the same field")
+
+        return Polynomial([a + b for a, b in zip_longest(self.p, other.p, fillvalue = self.field.element(0))], self.field) 
 
     def __sub__(self, other: Polynomial) -> Polynomial:
         """Subtract two polynomials coefficient-wise.
@@ -84,7 +91,10 @@ class Polynomial:
         Returns:
             New Polynomial representing the difference.
         """
-        raise NotImplementedError("Polynomial.__sub__: Subtract coefficients at each degree")
+        if self.field != other.field:
+            raise ValueError("Polynomials must be from the same field")
+
+        return Polynomial([a - b for a, b in zip_longest(self.p, other.p, fillvalue = self.field.element(0))], self.field) 
 
     def __mul__(self, other: Polynomial) -> Polynomial:
         """Multiply two polynomials (convolution of coefficients).
@@ -98,7 +108,20 @@ class Polynomial:
         Returns:
             New Polynomial representing the product.
         """
-        raise NotImplementedError("Polynomial.__mul__: Implement polynomial multiplication")
+        if self.field != other.field:
+            raise ValueError("Polynomials must be from the same field")
+        
+        if not self.p or not other.p:
+            return self.null
+
+        result_len = self.degree() + other.degree() + 1
+        result = [self.field.element(0)] * result_len
+        
+        for i, a in enumerate(self.p):
+            for j, b in enumerate(other.p):
+                result[i + j] += a * b
+
+        return Polynomial(result, self.field)
 
     def __mod__(self, other: Polynomial) -> Polynomial:
         """Compute remainder of polynomial division (self mod other).
@@ -115,8 +138,12 @@ class Polynomial:
 
         Raises:
             ZeroDivisionError: If other is the zero polynomial.
-        """
-        raise NotImplementedError("Polynomial.__mod__: Implement polynomial long division remainder")
+        """  
+        if self.field != other.field:
+            raise ValueError("Polynomials must be from the same field")
+
+        if not other.p:
+            raise ValueError("Other is the zero polynomial")
 
     def __truediv__(self, other: Polynomial) -> Polynomial:
         """Compute quotient of polynomial division.
@@ -130,7 +157,15 @@ class Polynomial:
         Raises:
             ZeroDivisionError: If other is the zero polynomial.
         """
-        raise NotImplementedError("Polynomial.__truediv__: Return quotient from long division")
+        if self.field != other.field:
+            raise ValueError("Polynomials must be from the same field")
+
+        if not other.p:
+            raise ValueError("Other is the zero polynomial")
+
+        raise NotImplementedError(
+            "Polynomial.is_irreducible: Implement Rabin's irreducibility test"
+        )
 
     def __pow__(self, exp: int, modulus: Polynomial | None = None) -> Polynomial:
         """Exponentiation with optional polynomial modulus.
@@ -148,18 +183,50 @@ class Polynomial:
         Returns:
             Resulting polynomial (reduced mod modulus if given).
         """
-        raise NotImplementedError(
-            "Polynomial.__pow__: Square-and-multiply with optional mod reduction"
-        )
+        result = Polynomial([self.field.element(1)], self.field)
+        base = self
+
+        while exp > 0:
+            if exp % 2 == 1:
+                result = result * base
+                if modulus:
+                    result = result % modulus
+            base = base * base
+            if modulus:
+                base = base % modulus
+            exp //= 2
+
+        return result
 
     def __eq__(self, other: object) -> bool:
         """Check polynomial equality (same coefficients)."""
-        raise NotImplementedError("Polynomial.__eq__: Compare coefficients")
+        if not isinstance(other, Polynomial):
+            return False
+        return self.field == other.field and self.p == other.p
 
     def __repr__(self) -> str:
-        raise NotImplementedError(
-            "Polynomial.__repr__: Return human-readable form like '1 + 0x + 1x^2'"
-        )
+        if not self.p:
+            return '0'
+
+        terms = []
+
+        for i, coef in enumerate(self.p):
+            if coef == 0:
+                continue
+
+            if i == 0:
+                terms.append(str(coef))
+            elif i == 1:
+                terms.append(f"{'' if coef == 1 else coef}x")
+            else:
+                terms.append(f"{'' if coef == 1 else coef}x^{i}")
+
+        return " + ".join(terms)
+
+    def make_monic(self) -> Polynomial:
+        if self.is_monic() or not self.p:
+            return self
+        return self / Polynomial([self.field.element(self.p[-1])], self.field)
 
     def gcd(self, other: Polynomial) -> Polynomial:
         """Compute GCD of two polynomials using Euclidean algorithm.
@@ -172,9 +239,14 @@ class Polynomial:
         Returns:
             The monic GCD polynomial.
         """
-        raise NotImplementedError(
-            "Polynomial.gcd: Euclidean algorithm using __mod__, then make monic"
-        )
+        if self.field != other.field:
+            raise ValueError("Polynomials must be from the same field")
+
+        f, g = self, other
+        while g.p:
+            r = f % g
+            f, g = g, r
+        return f.make_monic()
 
     def is_irreducible(self, k: int) -> bool:
         """Test if this polynomial is irreducible over F_p using Rabin's test.

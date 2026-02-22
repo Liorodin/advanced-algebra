@@ -67,6 +67,10 @@ class PrimeField:
     def __repr__(self) -> str:
         return f"F_{self.p}"
 
+    def __eq__(self, other: object):
+        if not isinstance(other, FieldElement):
+            return False
+        return self.p == other.p
 
 class FieldElement:
     """An element of F_p.
