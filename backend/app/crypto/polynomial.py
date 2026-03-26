@@ -10,6 +10,8 @@ Used primarily for:
 """
 
 from __future__ import annotations
+
+from app.crypto.prime_field import FieldElement
 from itertools import zip_longest
 from typing import TYPE_CHECKING
 
@@ -44,11 +46,15 @@ class Polynomial:
             >>> p = Polynomial([F.element(1), F.element(0), F.element(1)], F)
         """
         self.field = field
-        self.p = coefficients
-        self.null = Polynomial([], field)
+        self.p = list(coefficients)
 
-        while len(self.p) > 0 and self.p[-1] == 0:
+        zero = self.field.element(0)
+        while len(self.p) > 0 and self.p[-1] == zero:
             self.p.pop()
+
+    @property
+    def coeffs(self) -> list[FieldElement]:
+        return self.p
 
     def degree(self) -> int:
         """Return the degree of this polynomial.
@@ -66,7 +72,7 @@ class Polynomial:
         Returns:
             True if the polynomial is monic (leading coeff = 1).
         """
-        return self.p and self.p[-1] == 1
+        return bool(self.p) and self.p[-1] == self.field.element(1)
 
     def __add__(self, other: Polynomial) -> Polynomial:
         """Add two polynomials coefficient-wise.
@@ -112,7 +118,7 @@ class Polynomial:
             raise ValueError("Polynomials must be from the same field")
         
         if not self.p or not other.p:
-            return self.null
+            return Polynomial([], self.field)
 
         result_len = self.degree() + other.degree() + 1
         result = [self.field.element(0)] * result_len
@@ -137,13 +143,30 @@ class Polynomial:
             The remainder polynomial.
 
         Raises:
-            ZeroDivisionError: If other is the zero polynomial.
-        """  
+            ValueError: If other is the zero polynomial.
+        """
         if self.field != other.field:
             raise ValueError("Polynomials must be from the same field")
 
         if not other.p:
             raise ValueError("Other is the zero polynomial")
+
+        r = list[FieldElement](self.p)
+        d = other.degree()
+        lc_b = other.p[-1]
+        zero = self.field.element(0)
+
+        while len(r) > 0 and (len(r) - 1) >= d:
+            deg_r = len(r) - 1
+            lc_r = r[-1]
+            t = lc_r / lc_b
+            s = deg_r - d
+            for j in range(len(other.p)):
+                r[s + j] = r[s + j] - t * other.p[j]
+            while len(r) > 0 and r[-1] == zero:
+                r.pop()
+
+        return Polynomial(r, self.field)
 
     def __truediv__(self, other: Polynomial) -> Polynomial:
         """Compute quotient of polynomial division.
@@ -163,9 +186,30 @@ class Polynomial:
         if not other.p:
             raise ValueError("Other is the zero polynomial")
 
-        raise NotImplementedError(
-            "Polynomial.is_irreducible: Implement Rabin's irreducibility test"
-        )
+        dividend = list[FieldElement](self.p)
+        divisor = other.p
+        lc_divisor = divisor[-1]
+
+        if len(dividend) < len(divisor):
+            return Polynomial([self.field.element(0)], self.field)
+
+        quotient = [self.field.element(0)] * (len(dividend) - len(divisor) + 1)
+        zero = self.field.element(0)
+
+        while len(dividend) >= len(divisor) and any(c != zero for c in dividend):
+            deg_diff = len(dividend) - len(divisor)
+            lc_dividend = dividend[-1]
+            coeff = lc_dividend / lc_divisor
+            quotient[deg_diff] = coeff
+
+            for j in range(len(divisor)):
+                idx = deg_diff + j
+                dividend[idx] = dividend[idx] - coeff * divisor[j]
+
+            while dividend and dividend[-1] == zero:
+                dividend.pop()
+
+        return Polynomial(quotient, self.field)
 
     def __pow__(self, exp: int, modulus: Polynomial | None = None) -> Polynomial:
         """Exponentiation with optional polynomial modulus.
@@ -182,7 +226,12 @@ class Polynomial:
 
         Returns:
             Resulting polynomial (reduced mod modulus if given).
+
+        Raises:
+            ValueError: If exp is negative.
         """
+        if exp < 0:
+            raise ValueError("polynomial exponent must be non-negative")
         result = Polynomial([self.field.element(1)], self.field)
         base = self
 
@@ -209,17 +258,18 @@ class Polynomial:
             return '0'
 
         terms = []
+        one = self.field.element(1)
 
-        for i, coef in enumerate(self.p):
-            if coef == 0:
+        for i, coef in enumerate[FieldElement](self.p):
+            if coef == self.field.element(0):
                 continue
 
             if i == 0:
                 terms.append(str(coef))
             elif i == 1:
-                terms.append(f"{'' if coef == 1 else coef}x")
+                terms.append(f"{'' if coef == one else coef}x")
             else:
-                terms.append(f"{'' if coef == 1 else coef}x^{i}")
+                terms.append(f"{'' if coef == one else coef}x^{i}")
 
         return " + ".join(terms)
 
@@ -237,7 +287,8 @@ class Polynomial:
             other: Another Polynomial over the same field.
 
         Returns:
-            The monic GCD polynomial.
+            The monic GCD polynomial. For gcd(0, 0), returns the zero polynomial.
+
         """
         if self.field != other.field:
             raise ValueError("Polynomials must be from the same field")
@@ -266,6 +317,35 @@ class Polynomial:
         Returns:
             True if the polynomial is irreducible over F_p.
         """
-        raise NotImplementedError(
-            "Polynomial.is_irreducible: Implement Rabin's irreducibility test"
-        )
+        if k != self.degree():
+            raise ValueError("k must equal self.degree()")
+        if k < 1 or not self.p:
+            return False
+
+        p_char = self.field.p
+        x = Polynomial([self.field.element(0), self.field.element(1)], self.field)
+        one = Polynomial([self.field.element(1)], self.field)
+
+        def distinct_prime_factors(n: int) -> list[int]:
+            factors: list[int] = []
+            m = n
+            d = 2
+            while d * d <= m:
+                if m % d == 0:
+                    factors.append(d)
+                    while m % d == 0:
+                        m //= d
+                d += 1
+            if m > 1:
+                factors.append(m)
+            return factors
+
+        for pi in distinct_prime_factors(k):
+            n_i = k // pi
+            x_pow = pow(x, pow(p_char, n_i), self)
+            h_i = (x_pow - x) % self
+            if self.gcd(h_i) != one:
+                return False
+
+        x_pk = pow(x, pow(p_char, k), self)
+        return not ((x_pk - x) % self).p

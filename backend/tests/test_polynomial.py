@@ -36,7 +36,7 @@ class TestPolynomialInit:
     def test_is_monic(self, poly_x2_plus_1, field):
         assert poly_x2_plus_1.is_monic() is True
         not_monic = Polynomial([field.element(1), field.element(2)], field)
-        assert not_monic.is_monic() is True  # leading 2, so not monic if degree 1
+        assert not_monic.is_monic() is False  # leading 2, not monic
         two_x = Polynomial([field.element(0), field.element(2)], field)
         assert two_x.is_monic() is False
 
@@ -113,3 +113,16 @@ class TestPolynomialArithmetic:
         r = repr(poly_x2_plus_1)
         assert r is not None
         assert len(r) > 0
+
+    def test_repr_unit_x(self, field):
+        x = Polynomial([field.element(0), field.element(1)], field)
+        assert repr(x) == "x"
+
+    def test_init_does_not_mutate_caller_coeffs(self, field):
+        coeffs = [field.element(1), field.element(0), field.element(0)]
+        Polynomial(coeffs, field)
+        assert len(coeffs) == 3
+
+    def test_pow_negative_raises(self, field, poly_x):
+        with pytest.raises(ValueError, match="non-negative"):
+            poly_x ** -1

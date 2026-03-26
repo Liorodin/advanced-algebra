@@ -29,6 +29,11 @@ class TestPrimeField:
         field = PrimeField(small_prime)
         assert "103" in repr(field)
 
+    def test_prime_field_hashable(self, small_prime):
+        field = PrimeField(small_prime)
+        assert hash(field) == hash(PrimeField(small_prime))
+        assert field in {field: 1}
+
 
 class TestFieldElement:
     """Tests for FieldElement arithmetic in F_p."""
@@ -98,11 +103,18 @@ class TestFieldElement:
         q = field.element(4)
         assert q.is_quadratic_residue() is True
 
+    def test_is_quadratic_residue_zero(self, field):
+        assert field.element(0).is_quadratic_residue() is True
+
     def test_sqrt(self, field):
         # 4 = 2^2
         q = field.element(4)
         s = q.sqrt()
         assert (s * s).value == 4
+
+    def test_sqrt_zero(self, field):
+        s = field.element(0).sqrt()
+        assert s.value == 0
 
     def test_hash(self, field):
         a = field.element(5)

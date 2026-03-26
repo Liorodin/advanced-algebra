@@ -67,10 +67,13 @@ class PrimeField:
     def __repr__(self) -> str:
         return f"F_{self.p}"
 
-    def __eq__(self, other: object):
-        if not isinstance(other, FieldElement):
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, PrimeField):
             return False
         return self.p == other.p
+
+    def __hash__(self) -> int:
+        return hash((PrimeField, self.p))
 
 class FieldElement:
     """An element of F_p.
@@ -242,6 +245,8 @@ class FieldElement:
 
         Used by hash_to_point to check if a candidate x gives a valid curve point.
         """
+        if self.value == 0:
+            return True
         return pow(self.value, (self.field.p - 1) // 2, self.field.p) == 1
 
     def sqrt(self) -> FieldElement:
@@ -256,6 +261,8 @@ class FieldElement:
         Raises:
             ValueError: If self is not a quadratic residue.
         """
+        if self.value == 0:
+            return FieldElement(0, self.field)
         if not self.is_quadratic_residue():
             raise ValueError("Element is not a quadratic residue")
         return FieldElement(pow(self.value, (self.field.p + 1) // 4, self.field.p), self.field)
