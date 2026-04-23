@@ -34,9 +34,17 @@ class ExtensionField:
         Raises:
             ValueError: If the polynomial is not irreducible.
         """
-        raise NotImplementedError(
-            "ExtensionField.__init__: Store base field, modulus, and degree k"
-        )
+        from app.crypto.polynomial import Polynomial
+        
+        k = irreducible_poly.degree()
+        if k < 1:
+            raise ValueError("Irreducible polynomial must have degree >= 1")
+        if not irreducible_poly.is_irreducible(k):
+            raise ValueError("Polynomial is not irreducible")
+        
+        self.base_field = base_field
+        self.modulus = irreducible_poly
+        self.k = k
 
     def element(self, coefficients: list[int]) -> ExtFieldElement:
         """Create an element of the extension field.
@@ -51,9 +59,13 @@ class ExtensionField:
         Returns:
             An ExtFieldElement in this extension field.
         """
-        raise NotImplementedError(
-            "ExtensionField.element: Create ExtFieldElement from integer coefficients"
-        )
+        from app.crypto.polynomial import Polynomial
+        
+        # Convert int coefficients to FieldElements
+        field_coeffs = [self.base_field.element(c) for c in coefficients]
+        poly = Polynomial(field_coeffs, self.base_field)
+        
+        return ExtFieldElement(poly, self)
 
     @staticmethod
     def find_irreducible(base_field: PrimeField, k: int) -> Polynomial:
@@ -72,10 +84,33 @@ class ExtensionField:
         Returns:
             A monic irreducible Polynomial of degree k over F_p.
         """
-        raise NotImplementedError(
-            "ExtensionField.find_irreducible: For k=2 with p≡3 mod 4, return x²+1. "
-            "Otherwise search systematically."
-        )
+        from app.crypto.polynomial import Polynomial
+        
+        # Special case: k=2 and p ≡ 3 (mod 4) → x² + 1 is irreducible
+        if k == 2 and base_field.p % 4 == 3:
+            # x² + 1
+            coeffs = [base_field.element(1), base_field.element(0), base_field.element(1)]
+            return Polynomial(coeffs, base_field)
+        
+        # General case: systematic search for irreducible polynomial
+        # Try polynomials of the form x^k + ... + constant
+        # Start with constant term 1 (or 2 for better odds)
+        from itertools import product
+        
+        p = base_field.p
+        one = base_field.element(1)
+        
+        # For small k, try all combinations
+        # Coefficients for x^0, x^1, ..., x^{k-1} (x^k coefficient is always 1)
+        for coeff_tuple in product(range(p), repeat=k):
+            coeffs = [base_field.element(c) for c in coeff_tuple]
+            coeffs.append(one)  # Make it monic (leading coeff = 1)
+            
+            poly = Polynomial(coeffs, base_field)
+            if poly.is_irreducible(k):
+                return poly
+        
+        raise RuntimeError(f"Could not find irreducible polynomial of degree {k} over F_{p}")
 
     @staticmethod
     def find_embedding_degree(p: int, r: int) -> int:
@@ -95,13 +130,15 @@ class ExtensionField:
         Example:
             For p=103, r=13: k=2 since 103² - 1 = 10608 = 13 * 816.
         """
-        raise NotImplementedError(
-            "ExtensionField.find_embedding_degree: "
-            "Iterate k=1,2,3,... until pow(p, k, r) == 1"
-        )
+        k = 1
+        while pow(p, k, r) != 1:
+            k += 1
+            if k > 1000:  # Safety check
+                raise RuntimeError(f"Could not find embedding degree for p={p}, r={r}")
+        return k
 
     def __repr__(self) -> str:
-        raise NotImplementedError("ExtensionField.__repr__")
+        return f"F_{self.base_field.p}^{self.k}"
 
 
 class ExtFieldElement:
@@ -124,9 +161,8 @@ class ExtFieldElement:
             poly: A Polynomial over the base field.
             ext_field: The extension field.
         """
-        raise NotImplementedError(
-            "ExtFieldElement.__init__: Reduce poly mod ext_field.modulus, store result"
-        )
+        self.ext_field = ext_field
+        self.poly = poly % ext_field.modulus
 
     def __add__(self, other: ExtFieldElement) -> ExtFieldElement:
         """Add two extension field elements.
@@ -134,9 +170,10 @@ class ExtFieldElement:
         Returns:
             New ExtFieldElement representing the sum.
         """
-        raise NotImplementedError(
-            "ExtFieldElement.__add__: Add polynomials, reduce mod f(x)"
-        )
+        if self.ext_field != other.ext_field:
+            raise ValueError("Elements must be from the same extension field")
+        result_poly = (self.poly + other.poly) % self.ext_field.modulus
+        return ExtFieldElement(result_poly, self.ext_field)
 
     def __sub__(self, other: ExtFieldElement) -> ExtFieldElement:
         """Subtract two extension field elements.
@@ -144,9 +181,10 @@ class ExtFieldElement:
         Returns:
             New ExtFieldElement representing the difference.
         """
-        raise NotImplementedError(
-            "ExtFieldElement.__sub__: Subtract polynomials, reduce mod f(x)"
-        )
+        if self.ext_field != other.ext_field:
+            raise ValueError("Elements must be from the same extension field")
+        result_poly = (self.poly - other.poly) % self.ext_field.modulus
+        return ExtFieldElement(result_poly, self.ext_field)
 
     def __mul__(self, other: ExtFieldElement) -> ExtFieldElement:
         """Multiply two extension field elements.
@@ -154,9 +192,10 @@ class ExtFieldElement:
         Returns:
             New ExtFieldElement representing the product.
         """
-        raise NotImplementedError(
-            "ExtFieldElement.__mul__: Multiply polynomials, reduce mod f(x)"
-        )
+        if self.ext_field != other.ext_field:
+            raise ValueError("Elements must be from the same extension field")
+        result_poly = (self.poly * other.poly) % self.ext_field.modulus
+        return ExtFieldElement(result_poly, self.ext_field)
 
     def __truediv__(self, other: ExtFieldElement) -> ExtFieldElement:
         """Divide: self * other^{-1} in the extension field.
@@ -167,9 +206,7 @@ class ExtFieldElement:
         Raises:
             ZeroDivisionError: If other is the zero element.
         """
-        raise NotImplementedError(
-            "ExtFieldElement.__truediv__: Return self * other.inverse()"
-        )
+        return self * other.inverse()
 
     def __pow__(self, exp: int) -> ExtFieldElement:
         """Exponentiation using square-and-multiply in the extension field.
@@ -180,9 +217,29 @@ class ExtFieldElement:
         Returns:
             New ExtFieldElement representing self^exp.
         """
-        raise NotImplementedError(
-            "ExtFieldElement.__pow__: Square-and-multiply with mod f(x) reduction"
+        from app.crypto.polynomial import Polynomial
+        
+        if exp < 0:
+            return self.inverse() ** (-exp)
+        
+        if exp == 0:
+            one_poly = Polynomial([self.ext_field.base_field.element(1)], self.ext_field.base_field)
+            return ExtFieldElement(one_poly, self.ext_field)
+        
+        # Square-and-multiply
+        result = ExtFieldElement(
+            Polynomial([self.ext_field.base_field.element(1)], self.ext_field.base_field),
+            self.ext_field
         )
+        base = self
+        
+        while exp > 0:
+            if exp & 1:
+                result = result * base
+            base = base * base
+            exp >>= 1
+        
+        return result
 
     def __neg__(self) -> ExtFieldElement:
         """Negate the element.
@@ -190,16 +247,35 @@ class ExtFieldElement:
         Returns:
             New ExtFieldElement representing -self.
         """
-        raise NotImplementedError("ExtFieldElement.__neg__: Negate polynomial coefficients")
+        from app.crypto.polynomial import Polynomial
+        neg_coeffs = [-c for c in self.poly.coeffs]
+        neg_poly = Polynomial(neg_coeffs, self.ext_field.base_field)
+        return ExtFieldElement(neg_poly, self.ext_field)
 
     def __eq__(self, other: object) -> bool:
         """Check equality of extension field elements."""
-        raise NotImplementedError("ExtFieldElement.__eq__: Compare polynomials")
+        if not isinstance(other, ExtFieldElement):
+            return False
+        if self.ext_field != other.ext_field:
+            return False
+        return self.poly == other.poly
 
     def __repr__(self) -> str:
-        raise NotImplementedError(
-            "ExtFieldElement.__repr__: Display in terms of the generator (e.g., '22 + 49i')"
-        )
+        # For k=2, display as "a + bi" format
+        if self.ext_field.k == 2:
+            coeffs = self.poly.coeffs
+            a = coeffs[0].value if len(coeffs) > 0 else 0
+            b = coeffs[1].value if len(coeffs) > 1 else 0
+            
+            if b == 0:
+                return str(a)
+            elif a == 0:
+                return f"{b}i" if b != 1 else "i"
+            else:
+                return f"{a} + {b}i"
+        else:
+            # Generic polynomial representation
+            return str(self.poly)
 
     def inverse(self) -> ExtFieldElement:
         """Compute multiplicative inverse using extended GCD for polynomials.
@@ -213,7 +289,22 @@ class ExtFieldElement:
         Raises:
             ZeroDivisionError: If self is the zero element.
         """
-        raise NotImplementedError(
-            "ExtFieldElement.inverse: Extended Euclidean algorithm for polynomials. "
-            "Find g(x) where self.poly * g(x) + f(x) * h(x) = 1"
-        )
+        zero_elem = self.ext_field.base_field.element(0)
+        if len(self.poly.coeffs) == 1 and self.poly.coeffs[0] == zero_elem:
+            raise ZeroDivisionError("Cannot invert zero element")
+        
+        g, s, t = self.poly.extended_gcd(self.ext_field.modulus)
+        
+        # g should be a constant polynomial (degree 0)
+        if g.degree() != 0:
+            raise ZeroDivisionError("Element is not invertible")
+        
+        # Normalize: divide s by the constant g to get the true inverse
+        from app.crypto.polynomial import Polynomial
+        one = self.ext_field.base_field.element(1)
+        g_constant = g.coeffs[0]
+        
+        # s / g_constant gives us the inverse
+        inv_poly = Polynomial([c / g_constant for c in s.coeffs], self.ext_field.base_field)
+        
+        return ExtFieldElement(inv_poly, self.ext_field)

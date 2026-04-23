@@ -49,8 +49,12 @@ class Polynomial:
         self.p = list(coefficients)
 
         zero = self.field.element(0)
-        while len(self.p) > 0 and self.p[-1] == zero:
+        while len(self.p) > 1 and self.p[-1] == zero:
             self.p.pop()
+        
+        # Ensure zero polynomial is represented as [0] not []
+        if len(self.p) == 0:
+            self.p = [zero]
 
     @property
     def coeffs(self) -> list[FieldElement]:
@@ -64,6 +68,8 @@ class Polynomial:
         Returns:
             Integer degree, or -1 for the zero polynomial.
         """
+        if len(self.p) == 1 and self.p[0] == self.field.element(0):
+            return -1
         return len(self.p) - 1
 
     def is_monic(self) -> bool:
@@ -117,7 +123,9 @@ class Polynomial:
         if self.field != other.field:
             raise ValueError("Polynomials must be from the same field")
         
-        if not self.p or not other.p:
+        # Check for zero polynomials
+        zero = self.field.element(0)
+        if (len(self.p) == 1 and self.p[0] == zero) or (len(other.p) == 1 and other.p[0] == zero):
             return Polynomial([], self.field)
 
         result_len = self.degree() + other.degree() + 1
@@ -148,7 +156,8 @@ class Polynomial:
         if self.field != other.field:
             raise ValueError("Polynomials must be from the same field")
 
-        if not other.p:
+        zero_elem = self.field.element(0)
+        if len(other.p) == 1 and other.p[0] == zero_elem:
             raise ValueError("Other is the zero polynomial")
 
         r = list[FieldElement](self.p)
@@ -183,7 +192,8 @@ class Polynomial:
         if self.field != other.field:
             raise ValueError("Polynomials must be from the same field")
 
-        if not other.p:
+        zero_elem = self.field.element(0)
+        if len(other.p) == 1 and other.p[0] == zero_elem:
             raise ValueError("Other is the zero polynomial")
 
         dividend = list[FieldElement](self.p)
@@ -254,7 +264,8 @@ class Polynomial:
         return self.field == other.field and self.p == other.p
 
     def __repr__(self) -> str:
-        if not self.p:
+        zero = self.field.element(0)
+        if len(self.p) == 1 and self.p[0] == zero:
             return '0'
 
         terms = []
@@ -274,7 +285,8 @@ class Polynomial:
         return " + ".join(terms)
 
     def make_monic(self) -> Polynomial:
-        if self.is_monic() or not self.p:
+        zero = self.field.element(0)
+        if self.is_monic() or (len(self.p) == 1 and self.p[0] == zero):
             return self
         return self / Polynomial([self.field.element(self.p[-1])], self.field)
 
@@ -293,8 +305,9 @@ class Polynomial:
         if self.field != other.field:
             raise ValueError("Polynomials must be from the same field")
 
+        zero = self.field.element(0)
         f, g = self, other
-        while g.p:
+        while not (len(g.p) == 1 and g.p[0] == zero):
             r = f % g
             f, g = g, r
         return f.make_monic()
@@ -319,7 +332,11 @@ class Polynomial:
         """
         if k != self.degree():
             raise ValueError("k must equal self.degree()")
-        if k < 1 or not self.p:
+        if k < 1:
+            return False
+        
+        zero = self.field.element(0)
+        if len(self.p) == 1 and self.p[0] == zero:
             return False
 
         p_char = self.field.p
@@ -348,4 +365,39 @@ class Polynomial:
                 return False
 
         x_pk = pow(x, pow(p_char, k), self)
-        return not ((x_pk - x) % self).p
+        x_pk_minus_x = (x_pk - x) % self
+        zero = self.field.element(0)
+        return len(x_pk_minus_x.p) == 1 and x_pk_minus_x.p[0] == zero
+
+    def extended_gcd(self, other: Polynomial) -> tuple[Polynomial, Polynomial, Polynomial]:
+        """Extended Euclidean algorithm for polynomials.
+
+        Finds polynomials g, s, t such that:
+            s * self + t * other = g = gcd(self, other)
+
+        Used for computing inverses in extension fields.
+
+        Args:
+            other: Another Polynomial over the same field.
+
+        Returns:
+            Tuple (g, s, t) where g is the GCD and s, t are Bézout coefficients.
+        """
+        if self.field != other.field:
+            raise ValueError("Polynomials must be from the same field")
+
+        zero = Polynomial([], self.field)
+        one = Polynomial([self.field.element(1)], self.field)
+
+        old_r, r = self, other
+        old_s, s = one, zero
+        old_t, t = zero, one
+
+        zero_elem = self.field.element(0)
+        while not (len(r.p) == 1 and r.p[0] == zero_elem):
+            quotient = old_r / r
+            old_r, r = r, old_r - quotient * r
+            old_s, s = s, old_s - quotient * s
+            old_t, t = t, old_t - quotient * t
+
+        return old_r, old_s, old_t
