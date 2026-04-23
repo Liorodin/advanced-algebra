@@ -45,9 +45,11 @@ class ExtCurvePoint:
             y: y-coordinate as ExtFieldElement, or None for infinity.
             is_infinity: Whether this is the point at infinity.
         """
-        raise NotImplementedError(
-            "ExtCurvePoint.__init__: Store curve, ext_field, x, y, is_infinity"
-        )
+        self.curve = curve
+        self.ext_field = ext_field
+        self.x = x
+        self.y = y
+        self.is_infinity = is_infinity
 
     def __add__(self, other: ExtCurvePoint) -> ExtCurvePoint:
         """Point addition on E(F_{p^k}).
@@ -60,9 +62,43 @@ class ExtCurvePoint:
         Returns:
             New ExtCurvePoint representing the sum.
         """
-        raise NotImplementedError(
-            "ExtCurvePoint.__add__: Same formulas as ECPoint but with extension field arithmetic"
-        )
+        if self.curve != other.curve or self.ext_field != other.ext_field:
+            raise ValueError("Points must be on the same curve and extension field")
+        
+        # Case 1: P + O = P
+        if self.is_infinity:
+            return other
+        if other.is_infinity:
+            return self
+        
+        # Embed curve coefficients A into extension field
+        A_ext = self.ext_field.element([self.curve.A.value])
+        
+        # Case 2: P + (-P) = O (same x, opposite y)
+        if self.x == other.x and self.y != other.y:
+            return ExtCurvePoint(self.curve, self.ext_field, None, None, is_infinity=True)
+        
+        # Case 3: P + P (doubling)
+        if self == other:
+            zero = self.ext_field.element([0])
+            if self.y == zero:
+                return ExtCurvePoint(self.curve, self.ext_field, None, None, is_infinity=True)
+            # λ = (3x² + A) / (2y)
+            three = self.ext_field.element([3])
+            two = self.ext_field.element([2])
+            numerator = three * (self.x ** 2) + A_ext
+            denominator = two * self.y
+            lam = numerator / denominator
+        else:
+            # Case 4: P + Q (general addition)
+            # λ = (y_Q - y_P) / (x_Q - x_P)
+            lam = (other.y - self.y) / (other.x - self.x)
+        
+        # Common formula: x_R = λ² - x_P - x_Q, y_R = λ(x_P - x_R) - y_P
+        x_r = lam ** 2 - self.x - other.x
+        y_r = lam * (self.x - x_r) - self.y
+        
+        return ExtCurvePoint(self.curve, self.ext_field, x_r, y_r)
 
     def __neg__(self) -> ExtCurvePoint:
         """Point negation: -(x, y) = (x, -y).
@@ -70,7 +106,9 @@ class ExtCurvePoint:
         Returns:
             New ExtCurvePoint representing -P.
         """
-        raise NotImplementedError("ExtCurvePoint.__neg__: Return (x, -y)")
+        if self.is_infinity:
+            return self
+        return ExtCurvePoint(self.curve, self.ext_field, self.x, -self.y)
 
     def __mul__(self, scalar: int) -> ExtCurvePoint:
         """Scalar multiplication using double-and-add.
@@ -81,18 +119,44 @@ class ExtCurvePoint:
         Returns:
             New ExtCurvePoint representing scalar * P.
         """
-        raise NotImplementedError("ExtCurvePoint.__mul__: Double-and-add")
+        # Handle special cases
+        if scalar == 0:
+            return ExtCurvePoint(self.curve, self.ext_field, None, None, is_infinity=True)
+        if scalar < 0:
+            return (-self) * (-scalar)
+        
+        # Double-and-add algorithm
+        result = ExtCurvePoint(self.curve, self.ext_field, None, None, is_infinity=True)
+        addend = self
+        
+        while scalar > 0:
+            if scalar & 1:
+                result = result + addend
+            addend = addend + addend
+            scalar >>= 1
+        
+        return result
 
     def __rmul__(self, scalar: int) -> ExtCurvePoint:
         """Allow scalar * point syntax."""
-        raise NotImplementedError("ExtCurvePoint.__rmul__: Return self * scalar")
+        return self.__mul__(scalar)
 
     def __eq__(self, other: object) -> bool:
         """Check point equality."""
-        raise NotImplementedError("ExtCurvePoint.__eq__: Compare coordinates")
+        if not isinstance(other, ExtCurvePoint):
+            return False
+        if self.curve != other.curve or self.ext_field != other.ext_field:
+            return False
+        if self.is_infinity and other.is_infinity:
+            return True
+        if self.is_infinity or other.is_infinity:
+            return False
+        return self.x == other.x and self.y == other.y
 
     def __repr__(self) -> str:
-        raise NotImplementedError("ExtCurvePoint.__repr__")
+        if self.is_infinity:
+            return "O"
+        return f"({self.x}, {self.y})"
 
 
 def find_point_of_order_r(
@@ -127,7 +191,49 @@ def find_point_of_order_r(
     Raises:
         RuntimeError: If no suitable point is found.
     """
-    raise NotImplementedError(
-        "find_point_of_order_r: Search for Q in E(F_{p^k}) \\ E(F_p) with order r. "
-        "Try extension field points, cofactor-clear, check order."
-    )
+    p = ext_field.base_field.p
+    k = ext_field.k
+    
+    # Embed curve coefficients into extension field
+    A_ext = ext_field.element([curve.A.value])
+    B_ext = ext_field.element([curve.B.value])
+    
+    # For k=2, try points with non-zero imaginary component
+    # Try x = a + bi where b != 0
+    for a in range(p):
+        for b in range(1, p):  # b must be non-zero (not in base field)
+            x = ext_field.element([a, b])
+            
+            # Compute z = x³ + Ax + B
+            z = x**3 + A_ext * x + B_ext
+            
+            # Try to find y such that y² = z
+            # For small fields, brute force search
+            for c in range(p):
+                for d in range(p):
+                    y = ext_field.element([c, d])
+                    if y * y == z:
+                        # Found a point on the curve
+                        point = ExtCurvePoint(curve, ext_field, x, y)
+                        
+                        # Apply cofactor clearing
+                        # Need to compute |E(F_{p^k})| - approximately p^k + 1
+                        # For more accurate count, use the fact that for small fields
+                        # we can estimate or compute exactly
+                        # For now, use a heuristic: cofactor ≈ (p^k + 1) / r
+                        pk = p ** k
+                        # Hasse bound: |E(F_{p^k})| is in [p^k + 1 - 2√(p^k), p^k + 1 + 2√(p^k)]
+                        # Try a few candidates around p^k + 1
+                        for group_order_candidate in range(pk + 1 - int(2 * (pk ** 0.5)), 
+                                                          pk + 1 + int(2 * (pk ** 0.5)) + 1):
+                            if group_order_candidate % r == 0:
+                                cofactor = group_order_candidate // r
+                                Q = cofactor * point
+                                
+                                # Check if Q has order r and is not infinity
+                                if not Q.is_infinity:
+                                    # Verify order r
+                                    if (r * Q).is_infinity:
+                                        return Q
+            
+    raise RuntimeError(f"Could not find point of order {r} in E(F_{{{p}^{k}}})")
