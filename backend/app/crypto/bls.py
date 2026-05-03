@@ -68,10 +68,36 @@ class BLSSignatureScheme:
         Raises:
             ValueError: If parameters are invalid.
         """
-        raise NotImplementedError(
-            "BLSSignatureScheme.__init__: Set up field, curve, compute |G|, r, k, "
-            "extension field, find Q, compute aQ"
-        )
+        # Step 1: Create prime field
+        self.field = PrimeField(p)
+        
+        # Step 2: Create elliptic curve
+        self.curve = EllipticCurve(self.field, A, B)
+        
+        # Step 3: Compute group order
+        self.group_order = self.curve.group_order()
+        
+        # Step 4: Find largest prime factor r
+        self.r = largest_prime_factor(self.group_order)
+        
+        # Step 5: Compute cofactor
+        self.cofactor = self.group_order // self.r
+        
+        # Step 6: Find embedding degree k
+        self.k = ExtensionField.find_embedding_degree(p, self.r)
+        
+        # Step 7: Find irreducible polynomial
+        irr_poly = ExtensionField.find_irreducible(self.field, self.k)
+        
+        # Step 8: Create extension field
+        self.ext_field = ExtensionField(self.field, irr_poly)
+        
+        # Step 9: Find point Q of order r in E(F_{p^k})
+        self.Q = find_point_of_order_r(self.curve, self.ext_field, self.r)
+        
+        # Step 10: Store private key and compute public key
+        self.private_key = private_key
+        self.public_key = private_key * self.Q
 
     def sign(self, message: str) -> ECPoint:
         """Sign a message: compute sig = a * H(m).
@@ -82,9 +108,9 @@ class BLSSignatureScheme:
         Returns:
             ECPoint representing the signature a * H(m).
         """
-        raise NotImplementedError(
-            "BLSSignatureScheme.sign: Return private_key * hash_to_point(message, curve, r)"
-        )
+        H_m = hash_to_point(message, self.curve, self.r)
+        signature = self.private_key * H_m
+        return signature
 
     def tate_pairing(self, P: ECPoint, Q: ExtCurvePoint) -> ExtFieldElement:
         """Compute the reduced Tate pairing e_r(P, Q).
@@ -101,10 +127,16 @@ class BLSSignatureScheme:
         Returns:
             ExtFieldElement — the pairing value in F_{p^k}^*.
         """
-        raise NotImplementedError(
-            "BLSSignatureScheme.tate_pairing: "
-            "Compute miller(P, Q, r) then raise to ((p^k - 1) / r)"
-        )
+        # Compute Miller function
+        f = miller(P, Q, self.r)
+        
+        # Final exponentiation: raise to (p^k - 1) / r
+        p = self.field.p
+        pk = p ** self.k
+        exponent = (pk - 1) // self.r
+        
+        e_r = f ** exponent
+        return e_r
 
     def verify(self, message: str, signature: ECPoint) -> bool:
         """Verify a BLS signature.
@@ -123,10 +155,17 @@ class BLSSignatureScheme:
         Returns:
             True if the signature is valid.
         """
-        raise NotImplementedError(
-            "BLSSignatureScheme.verify: "
-            "Compute e_r(sig, Q) and e_r(H(m), aQ), compare"
-        )
+        # Compute H(m)
+        H_m = hash_to_point(message, self.curve, self.r)
+        
+        # Compute LHS: e_r(sig, Q)
+        lhs = self.tate_pairing(signature, self.Q)
+        
+        # Compute RHS: e_r(H(m), aQ)
+        rhs = self.tate_pairing(H_m, self.public_key)
+        
+        # Compare
+        return lhs == rhs
 
     def get_steps(self, message: str) -> dict[str, Any]:
         """Return all intermediate computation steps for display.
@@ -146,7 +185,42 @@ class BLSSignatureScheme:
             - pairing_lhs, pairing_rhs (string representations)
             - verified (bool)
         """
-        raise NotImplementedError(
-            "BLSSignatureScheme.get_steps: Sign message, compute both pairings, "
-            "collect all intermediate values into a dict"
-        )
+        # Sign the message
+        H_m = hash_to_point(message, self.curve, self.r)
+        signature = self.sign(message)
+        
+        # Compute pairings
+        pairing_lhs = self.tate_pairing(signature, self.Q)
+        pairing_rhs = self.tate_pairing(H_m, self.public_key)
+        
+        # Verify
+        verified = (pairing_lhs == pairing_rhs)
+        
+        # Collect all steps
+        return {
+            "group_order": self.group_order,
+            "r": self.r,
+            "cofactor": self.cofactor,
+            "embedding_degree": self.k,
+            "irreducible_poly": str(self.ext_field.modulus),
+            "hash_point": {
+                "x": str(H_m.x.value) if not H_m.is_infinity else None,
+                "y": str(H_m.y.value) if not H_m.is_infinity else None,
+            },
+            "signature": {
+                "x": str(signature.x.value) if not signature.is_infinity else None,
+                "y": str(signature.y.value) if not signature.is_infinity else None,
+            },
+            "Q": {
+                "x": str(self.Q.x) if not self.Q.is_infinity else None,
+                "y": str(self.Q.y) if not self.Q.is_infinity else None,
+            },
+            "public_key": {
+                "x": str(self.public_key.x) if not self.public_key.is_infinity else None,
+                "y": str(self.public_key.y) if not self.public_key.is_infinity else None,
+            },
+            "pairing_lhs": str(pairing_lhs),
+            "pairing_rhs": str(pairing_rhs),
+            "verified": verified,
+            "display_message": f'{"✓" if verified else "✗"} Message was {"verified" if verified else "NOT verified"}',
+        }

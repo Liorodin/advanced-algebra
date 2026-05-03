@@ -69,48 +69,29 @@ class ExtensionField:
 
     @staticmethod
     def find_irreducible(base_field: PrimeField, k: int) -> Polynomial:
-        """Find a monic irreducible polynomial of degree k over F_p.
-
-        Strategy: iterate over monic polynomials of degree k (with constant
-        term set to make it likely irreducible) and test each using Rabin's test.
-
-        For k=2 and p ≡ 3 (mod 4), x² + 1 is always irreducible since
-        -1 is not a quadratic residue.
-
-        Args:
-            base_field: The prime field F_p.
-            k: The desired degree.
-
-        Returns:
-            A monic irreducible Polynomial of degree k over F_p.
-        """
+        """Find a monic irreducible polynomial of degree k over F_p using randomized search."""
         from app.crypto.polynomial import Polynomial
+        import random
         
         # Special case: k=2 and p ≡ 3 (mod 4) → x² + 1 is irreducible
         if k == 2 and base_field.p % 4 == 3:
-            # x² + 1
             coeffs = [base_field.element(1), base_field.element(0), base_field.element(1)]
             return Polynomial(coeffs, base_field)
         
-        # General case: systematic search for irreducible polynomial
-        # Try polynomials of the form x^k + ... + constant
-        # Start with constant term 1 (or 2 for better odds)
-        from itertools import product
-        
         p = base_field.p
         one = base_field.element(1)
+        max_attempts = 1000  # הגבלת ביטחון כדי למנוע לולאה אינסופית במקרה של שגיאה
         
-        # For small k, try all combinations
-        # Coefficients for x^0, x^1, ..., x^{k-1} (x^k coefficient is always 1)
-        for coeff_tuple in product(range(p), repeat=k):
-            coeffs = [base_field.element(c) for c in coeff_tuple]
-            coeffs.append(one)  # Make it monic (leading coeff = 1)
+        for _ in range(max_attempts):
+            # הגרלת מקדמים אקראיים עבור x^0 עד x^{k-1}
+            coeffs = [base_field.element(random.randint(0, p - 1)) for _ in range(k)]
+            coeffs.append(one)  # הפיכת הפולינום למתוקן (monic) על ידי קביעת המקדם המוביל כ-1
             
             poly = Polynomial(coeffs, base_field)
             if poly.is_irreducible(k):
                 return poly
         
-        raise RuntimeError(f"Could not find irreducible polynomial of degree {k} over F_{p}")
+        raise RuntimeError(f"Could not find irreducible polynomial of degree {k} over F_{p} after {max_attempts} attempts")
 
     @staticmethod
     def find_embedding_degree(p: int, r: int) -> int:

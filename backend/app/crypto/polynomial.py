@@ -178,46 +178,36 @@ class Polynomial:
         return Polynomial(r, self.field)
 
     def __truediv__(self, other: Polynomial) -> Polynomial:
-        """Compute quotient of polynomial division.
-
-        Args:
-            other: The divisor polynomial (must be non-zero).
-
-        Returns:
-            The quotient polynomial.
-
-        Raises:
-            ZeroDivisionError: If other is the zero polynomial.
-        """
+        """Compute quotient of polynomial division safely without dynamic popping."""
         if self.field != other.field:
             raise ValueError("Polynomials must be from the same field")
 
         zero_elem = self.field.element(0)
         if len(other.p) == 1 and other.p[0] == zero_elem:
-            raise ValueError("Other is the zero polynomial")
+            raise ZeroDivisionError("Other is the zero polynomial")
 
-        dividend = list[FieldElement](self.p)
+        dividend = list(self.p)
         divisor = other.p
-        lc_divisor = divisor[-1]
 
+        # אם מעלת המונה קטנה ממעלת המכנה, המנה היא 0
         if len(dividend) < len(divisor):
-            return Polynomial([self.field.element(0)], self.field)
+            return Polynomial([zero_elem], self.field)
 
-        quotient = [self.field.element(0)] * (len(dividend) - len(divisor) + 1)
-        zero = self.field.element(0)
+        deg_dividend = len(dividend) - 1
+        deg_divisor = len(divisor) - 1
+        
+        # איתחול מערך המנה באורך המדויק
+        quotient = [zero_elem] * (deg_dividend - deg_divisor + 1)
 
-        while len(dividend) >= len(divisor) and any(c != zero for c in dividend):
-            deg_diff = len(dividend) - len(divisor)
-            lc_dividend = dividend[-1]
-            coeff = lc_dividend / lc_divisor
-            quotient[deg_diff] = coeff
-
-            for j in range(len(divisor)):
-                idx = deg_diff + j
-                dividend[idx] = dividend[idx] - coeff * divisor[j]
-
-            while dividend and dividend[-1] == zero:
-                dividend.pop()
+        # חילוק ארוך באמצעות אינדקסים סטטיים
+        for i in range(deg_dividend - deg_divisor, -1, -1):
+            if dividend[i + deg_divisor] != zero_elem:
+                coeff = dividend[i + deg_divisor] / divisor[-1]
+                quotient[i] = coeff
+                
+                # החסרת המכנה המוכפל מהמונה
+                for j in range(deg_divisor + 1):
+                    dividend[i + j] = dividend[i + j] - coeff * divisor[j]
 
         return Polynomial(quotient, self.field)
 

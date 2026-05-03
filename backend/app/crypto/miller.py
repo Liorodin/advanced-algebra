@@ -52,11 +52,77 @@ def line_function(
     Returns:
         ExtFieldElement — the value of the line function at Q.
     """
-    raise NotImplementedError(
-        "line_function: Compute the line through P and R, evaluate at Q. "
-        "Handle three cases: P≠R, P==R (tangent), P=-R (vertical). "
-        "Must embed F_p coordinates into F_{p^k} for arithmetic with Q."
-    )
+    ext_field = Q.ext_field
+    
+    # Handle infinity cases
+    if P.is_infinity or R.is_infinity:
+        # Return 1 (identity in multiplicative group)
+        from app.crypto.polynomial import Polynomial
+        return ext_field.element([1])
+    
+    # Embed P and R coordinates into extension field
+    x_P = ext_field.element([P.x.value])
+    y_P = ext_field.element([P.y.value])
+    x_R = ext_field.element([R.x.value])
+    y_R = ext_field.element([R.y.value])
+    
+    # Case 3: P = -R (vertical line)
+    if P.x == R.x and P.y != R.y:
+        # Vertical line: x - x_P
+        return Q.x - x_P
+    
+    # Cases 1 and 2: Need to compute slope λ
+    if P == R:
+        # Case 2: Tangent line (doubling)
+        # λ = (3x_P² + A) / (2y_P)
+        A_ext = ext_field.element([P.curve.A.value])
+        three = ext_field.element([3])
+        two = ext_field.element([2])
+        numerator = three * (x_P ** 2) + A_ext
+        denominator = two * y_P
+    else:
+        # Case 1: Line through distinct points
+        # λ = (y_R - y_P) / (x_R - x_P)
+        numerator = y_R - y_P
+        denominator = x_R - x_P
+    
+    # Check for vertical line (denominator = 0)
+    zero = ext_field.element([0])
+    if denominator == zero:
+        return Q.x - x_P
+    
+    lam = numerator / denominator
+    
+    # Line equation: y - y_P - λ(x - x_P) = 0
+    # Evaluate at Q: (y_Q - y_P) - λ * (x_Q - x_P)
+    result = (Q.y - y_P) - lam * (Q.x - x_P)
+    
+    return result
+
+
+def vertical_line(R: ECPoint, Q: ExtCurvePoint) -> ExtFieldElement:
+    """Evaluate the vertical line through R at the point Q.
+    
+    The vertical line through R = (x_R, y_R) is: x = x_R
+    Evaluated at Q = (x_Q, y_Q): x_Q - x_R
+    
+    Args:
+        R: Point defining the vertical line (ECPoint with F_p coordinates).
+        Q: Evaluation point (ExtCurvePoint with F_{p^k} coordinates).
+    
+    Returns:
+        ExtFieldElement — the value (x_Q - x_R).
+    """
+    ext_field = Q.ext_field
+    
+    # Handle infinity
+    if R.is_infinity:
+        return ext_field.element([1])
+    
+    # Embed R.x into extension field
+    x_R = ext_field.element([R.x.value])
+    
+    return Q.x - x_R
 
 
 def miller(
@@ -93,9 +159,51 @@ def miller(
     Returns:
         ExtFieldElement f_{r,P}(Q) — the Miller function value.
     """
-    raise NotImplementedError(
-        "miller: Implement Miller's algorithm using binary expansion of r. "
-        "For each bit: doubling step (f = f² * line(T,T,Q), T = 2T), "
-        "then if bit=1: addition step (f = f * line(T,P,Q), T = T+P). "
-        "Return the accumulated f value."
-    )
+    ext_field = Q.ext_field
+    
+    # Handle edge case
+    if P.is_infinity:
+        return ext_field.element([1])
+    
+    # Get binary representation of r (as a list of bits from MSB to LSB)
+    r_bits = []
+    temp_r = r
+    while temp_r > 0:
+        r_bits.append(temp_r & 1)
+        temp_r >>= 1
+    r_bits.reverse()  # Now MSB first
+    
+    # Initialize with T = P, f = 1 (this accounts for the MSB which is always 1)
+    T = P
+    f = ext_field.element([1])
+    
+    # Process remaining bits from second-most significant to least significant
+    for i in range(1, len(r_bits)):
+        # Doubling step
+        doubled_T = T + T
+        line_val = line_function(T, T, Q)
+        vert_val = vertical_line(doubled_T, Q)
+        
+        # Check for degenerate case (Q on vertical line)
+        zero = ext_field.element([0])
+        if vert_val == zero:
+            # Pairing is degenerate; return 1 (or could return 0)
+            return ext_field.element([1])
+        
+        f = (f ** 2) * line_val / vert_val
+        T = doubled_T
+        
+        # Addition step (if bit is 1)
+        if r_bits[i] == 1:
+            added_T = T + P
+            line_val = line_function(T, P, Q)
+            vert_val = vertical_line(added_T, Q)
+            
+            # Check for degenerate case
+            if vert_val == zero:
+                return ext_field.element([1])
+            
+            f = f * line_val / vert_val
+            T = added_T
+    
+    return f
