@@ -44,7 +44,7 @@ class BLSSignatureScheme:
         public_key: aQ (ExtCurvePoint).
     """
 
-    def __init__(self, p: int, A: int, B: int, private_key: int) -> None:
+    def __init__(self, p: int, A: int, B: int, private_key: int, k: int | None = None) -> None:
         """Initialize the BLS signature scheme.
 
         Setup pipeline:
@@ -53,7 +53,7 @@ class BLSSignatureScheme:
         3. Compute group_order = |E(F_p)|
         4. Find r = largest_prime_factor(group_order)
         5. Compute cofactor = group_order / r
-        6. Find embedding degree k
+        6. Find embedding degree k (or use supplied k)
         7. Find irreducible polynomial of degree k
         8. Create ExtensionField
         9. Find point Q of order r in E(F_{p^k})
@@ -64,10 +64,15 @@ class BLSSignatureScheme:
             A: Curve parameter A.
             B: Curve parameter B.
             private_key: Secret key integer a.
+            k: Optional embedding degree. Auto-computed if None.
 
         Raises:
             ValueError: If parameters are invalid.
         """
+        #requires 1 < a < p-1
+        if not (1 < private_key < p - 1):
+            raise ValueError(f"Private key must satisfy 1 < a < p-1, got {private_key}")
+
         # Step 1: Create prime field
         self.field = PrimeField(p)
         
@@ -83,8 +88,15 @@ class BLSSignatureScheme:
         # Step 5: Compute cofactor
         self.cofactor = self.group_order // self.r
         
-        # Step 6: Find embedding degree k
-        self.k = ExtensionField.find_embedding_degree(p, self.r)
+        # Step 6: Embedding degree k (user-supplied or auto-computed)
+        if k is not None:
+            if k < 2:
+                raise ValueError(f"Embedding degree k must be > 1, got {k}")
+            if pow(p, k, self.r) != 1:
+                raise ValueError(f"k={k} is invalid: r={self.r} does not divide p^k - 1")
+            self.k = k
+        else:
+            self.k = ExtensionField.find_embedding_degree(p, self.r)
         
         # Step 7: Find irreducible polynomial
         irr_poly = ExtensionField.find_irreducible(self.field, self.k)
@@ -155,15 +167,19 @@ class BLSSignatureScheme:
         Returns:
             True if the signature is valid.
         """
+        # A valid BLS signature is never the identity point
+        if signature.is_infinity:
+            return False
+
         # Compute H(m)
         H_m = hash_to_point(message, self.curve, self.r)
-        
+
         # Compute LHS: e_r(sig, Q)
         lhs = self.tate_pairing(signature, self.Q)
-        
+
         # Compute RHS: e_r(H(m), aQ)
         rhs = self.tate_pairing(H_m, self.public_key)
-        
+
         # Compare
         return lhs == rhs
 

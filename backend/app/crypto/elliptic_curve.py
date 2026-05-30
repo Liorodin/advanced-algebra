@@ -109,6 +109,14 @@ class EllipticCurve:
         """
         return ECPoint(self, None, None, is_infinity=True)
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, EllipticCurve):
+            return False
+        return self.field == other.field and self.A == other.A and self.B == other.B
+
+    def __hash__(self) -> int:
+        return hash((self.field, self.A.value, self.B.value))
+
     def __repr__(self) -> str:
         return f"E: y² = x³ + {self.A}x + {self.B} over {self.field}"
 
@@ -144,6 +152,7 @@ class ECPoint:
         self.x = x
         self.y = y
         self.is_infinity = is_infinity
+        self._order: int | None = None  # cached on first call to order()
 
     def __add__(self, other: ECPoint) -> ECPoint:
         """Elliptic curve point addition.
@@ -273,28 +282,22 @@ class ECPoint:
         Returns:
             The order of this point.
         """
+        if self._order is not None:
+            return self._order
+
         if self.is_infinity:
+            self._order = 1
             return 1
-        
+
         group_order = self.curve.group_order()
-        
-        # Test divisors of group_order
-        from app.crypto.utils import prime_factors
-        factors = list(set(prime_factors(group_order)))
-        
-        # Start with group_order and divide by prime factors
-        candidates = [group_order]
-        for p in factors:
-            new_candidates = []
-            for n in candidates:
-                if n % p == 0:
-                    new_candidates.append(n // p)
-            candidates.extend(new_candidates)
-        
-        # Sort and test
-        candidates = sorted(set(candidates))
+
+        # Generate ALL divisors of group_order (the order of P must divide |G|)
+        candidates = sorted(d for d in range(1, group_order + 1) if group_order % d == 0)
+
         for n in candidates:
             if (n * self).is_infinity:
+                self._order = n
                 return n
-        
+
+        self._order = group_order
         return group_order

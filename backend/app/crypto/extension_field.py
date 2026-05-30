@@ -111,12 +111,21 @@ class ExtensionField:
         Example:
             For p=103, r=13: k=2 since 103² - 1 = 10608 = 13 * 816.
         """
-        k = 1
+        # Paper requires k > 1 — the extension field must be non-trivial
+        k = 2
         while pow(p, k, r) != 1:
             k += 1
-            if k > 1000:  # Safety check
+            if k > 1000:
                 raise RuntimeError(f"Could not find embedding degree for p={p}, r={r}")
         return k
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, ExtensionField):
+            return False
+        return self.base_field == other.base_field and self.modulus == other.modulus
+
+    def __hash__(self) -> int:
+        return hash((self.base_field, tuple(c.value for c in self.modulus.coeffs)))
 
     def __repr__(self) -> str:
         return f"F_{self.base_field.p}^{self.k}"
@@ -240,6 +249,9 @@ class ExtFieldElement:
         if self.ext_field != other.ext_field:
             return False
         return self.poly == other.poly
+
+    def __hash__(self) -> int:
+        return hash(tuple(c.value for c in self.poly.coeffs))
 
     def __repr__(self) -> str:
         # For k=2, display as "a + bi" format

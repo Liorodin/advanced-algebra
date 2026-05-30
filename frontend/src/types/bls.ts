@@ -11,6 +11,7 @@ export interface BLSRequest {
   B: number;
   private_key: number;
   message: string;
+  k?: number;  // optional embedding degree; omit to auto-compute
 }
 
 /** Response from the BLS signature pipeline with all intermediate steps. */

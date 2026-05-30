@@ -278,7 +278,7 @@ class Polynomial:
         zero = self.field.element(0)
         if self.is_monic() or (len(self.p) == 1 and self.p[0] == zero):
             return self
-        return self / Polynomial([self.field.element(self.p[-1])], self.field)
+        return self / Polynomial([self.field.element(self.p[-1].value)], self.field)
 
     def gcd(self, other: Polynomial) -> Polynomial:
         """Compute GCD of two polynomials using Euclidean algorithm.
@@ -295,9 +295,8 @@ class Polynomial:
         if self.field != other.field:
             raise ValueError("Polynomials must be from the same field")
 
-        zero = self.field.element(0)
         f, g = self, other
-        while not (len(g.p) == 1 and g.p[0] == zero):
+        while g.degree() >= 0:
             r = f % g
             f, g = g, r
         return f.make_monic()
@@ -356,8 +355,7 @@ class Polynomial:
 
         x_pk = pow(x, pow(p_char, k), self)
         x_pk_minus_x = (x_pk - x) % self
-        zero = self.field.element(0)
-        return len(x_pk_minus_x.p) == 1 and x_pk_minus_x.p[0] == zero
+        return x_pk_minus_x.degree() < 0
 
     def extended_gcd(self, other: Polynomial) -> tuple[Polynomial, Polynomial, Polynomial]:
         """Extended Euclidean algorithm for polynomials.
@@ -383,8 +381,7 @@ class Polynomial:
         old_s, s = one, zero
         old_t, t = zero, one
 
-        zero_elem = self.field.element(0)
-        while not (len(r.p) == 1 and r.p[0] == zero_elem):
+        while r.degree() >= 0:
             quotient = old_r / r
             old_r, r = r, old_r - quotient * r
             old_s, s = s, old_s - quotient * s

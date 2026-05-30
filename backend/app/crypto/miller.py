@@ -161,8 +161,8 @@ def miller(
     """
     ext_field = Q.ext_field
     
-    # Handle edge case
-    if P.is_infinity:
+    # Handle degenerate inputs
+    if P.is_infinity or Q.is_infinity:
         return ext_field.element([1])
     
     # Get binary representation of r (as a list of bits from MSB to LSB)

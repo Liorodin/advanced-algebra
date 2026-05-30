@@ -95,10 +95,27 @@ class TestHashToPoint:
         assert P1 == P2
 
     def test_different_messages_different_points(self, curve):
+        # With p=103 there are only 13 possible hash outputs so many message
+        # pairs collide.  Scan candidates until we find two distinct points
+        # rather than relying on hard-coded strings.
         r = 13
-        P1 = hash_to_point("msg1", curve, r)
-        P2 = hash_to_point("msg2", curve, r)
-        assert P1 != P2
+        candidates = [
+            "שלום", "world", "hello", "test", "a", "b", "abc",
+            "foo", "bar", "baz", "alpha", "beta", "gamma",
+        ]
+        first_point, first_msg = None, None
+        for msg in candidates:
+            P = hash_to_point(msg, curve, r)
+            if P.is_infinity:
+                continue
+            if first_point is None:
+                first_point, first_msg = P, msg
+            elif P != first_point:
+                return  # found two distinct non-identity points — test passes
+        pytest.fail(
+            f"Could not find two messages that hash to different points "
+            f"(first was '{first_msg}' → {first_point})"
+        )
 
     def test_result_has_order_r(self, curve):
         r = 13
