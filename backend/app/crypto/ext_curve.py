@@ -191,49 +191,152 @@ def find_point_of_order_r(
     Raises:
         RuntimeError: If no suitable point is found.
     """
+    import random
+    import math
+
     p = ext_field.base_field.p
     k = ext_field.k
-    
-    # Embed curve coefficients into extension field
+    pk = p ** k  # |F_{p^k}|
+
     A_ext = ext_field.element([curve.A.value])
     B_ext = ext_field.element([curve.B.value])
-    
-    # For k=2, try points with non-zero imaginary component
-    # Try x = a + bi where b != 0
-    for a in range(p):
-        for b in range(1, p):  # b must be non-zero (not in base field)
-            x = ext_field.element([a, b])
-            
-            # Compute z = x³ + Ax + B
-            z = x**3 + A_ext * x + B_ext
-            
-            # Try to find y such that y² = z
-            # For small fields, brute force search
-            for c in range(p):
-                for d in range(p):
-                    y = ext_field.element([c, d])
-                    if y * y == z:
-                        # Found a point on the curve
-                        point = ExtCurvePoint(curve, ext_field, x, y)
-                        
-                        # Apply cofactor clearing
-                        # Need to compute |E(F_{p^k})| - approximately p^k + 1
-                        # For more accurate count, use the fact that for small fields
-                        # we can estimate or compute exactly
-                        # For now, use a heuristic: cofactor ≈ (p^k + 1) / r
-                        pk = p ** k
-                        # Hasse bound: |E(F_{p^k})| is in [p^k + 1 - 2√(p^k), p^k + 1 + 2√(p^k)]
-                        # Try a few candidates around p^k + 1
-                        for group_order_candidate in range(pk + 1 - int(2 * (pk ** 0.5)), 
-                                                          pk + 1 + int(2 * (pk ** 0.5)) + 1):
-                            if group_order_candidate % r == 0:
-                                cofactor = group_order_candidate // r
-                                Q = cofactor * point
-                                
-                                # Check if Q has order r and is not infinity
-                                if not Q.is_infinity:
-                                    # Verify order r
-                                    if (r * Q).is_infinity:
-                                        return Q
-            
+    zero  = ext_field.element([0])
+    one   = ext_field.element([1])
+    # Euler exponent: z is a QR in F_{p^k} iff z^{(p^k-1)/2} = 1
+    euler_exp = (pk - 1) // 2
+    # Hasse bound: |E(F_{p^k})| lies within 2√(p^k) of p^k + 1
+    hasse = int(2 * math.isqrt(pk)) + 2
+
+    rng = random.Random(42)
+
+    for attempt in range(50_000):
+        # Pick x with all k coefficients, ensuring at least one higher-degree
+        # term is non-zero so x is genuinely outside F_p (and its subfields).
+        # The original implementation only tried [a, b, 0, 0, ...] which
+        # restricts the search to a 2-dimensional subspace of F_{p^k}.
+        while True:
+            coeffs = [rng.randint(0, p - 1) for _ in range(k)]
+            if any(c != 0 for c in coeffs[1:]):
+                break
+
+        x = ext_field.element(coeffs)
+        z = x**3 + A_ext * x + B_ext
+
+        if z == zero:
+            continue  # y = 0 gives a 2-torsion point — skip
+
+        # Euler criterion: reject half the candidates without doing a sqrt
+        if z ** euler_exp != one:
+            continue
+
+        # Compute sqrt(z) in F_{p^k}
+        y = _sqrt_in_ext(z, ext_field, pk, one, rng)
+        if y is None:
+            continue
+
+        point = ExtCurvePoint(curve, ext_field, x, y)
+
+        # Cofactor clearing: we don't know |E(F_{p^k})| exactly, so we scan
+        # every multiple of r inside the Hasse band [p^k+1 ± 2√(p^k)].
+        # Multiplying by |E|/r maps any point into the r-torsion subgroup.
+        for n_candidate in range(pk + 1 - hasse, pk + 1 + hasse + 1):
+            if n_candidate % r != 0:
+                continue
+            Q = (n_candidate // r) * point
+            if Q.is_infinity or not (r * Q).is_infinity:
+                continue
+            # A Q whose coordinates are constant polynomials (all higher-degree
+            # coefficients zero) is actually in E(F_p), not E(F_{p^k}).
+            # Such a Q gives a trivial pairing — reject it.
+            if _is_in_base_field(Q):
+                continue
+            return Q
+
     raise RuntimeError(f"Could not find point of order {r} in E(F_{{{p}^{k}}})")
+
+
+def _sqrt_in_ext(z, ext_field, pk: int, one, rng):
+    """Return y with y² = z in ext_field, or None if not found.
+
+    Three strategies, in order of preference:
+    1. p^k ≡ 3 (mod 4): closed-form y = z^{(p^k+1)/4}  (same trick as F_p)
+    2. p^k ≤ 100 000: brute-force over all elements of F_{p^k}
+    3. General: Tonelli-Shanks algorithm lifted to F_{p^k}
+    """
+    p = ext_field.base_field.p
+    k = ext_field.k
+
+    # Strategy 1: simple formula when p^k ≡ 3 (mod 4)
+    if pk % 4 == 3:
+        y = z ** ((pk + 1) // 4)
+        return y if y * y == z else None
+
+    # Strategy 2: brute force for small fields (p^k ≤ 100 000)
+    # For p=7, k=4: p^k = 2401 — only 2401 candidates, very fast
+    if pk <= 100_000:
+        from itertools import product
+        for coeffs in product(range(p), repeat=k):
+            y = ext_field.element(list(coeffs))
+            if y * y == z:
+                return y
+        return None
+
+    # Strategy 3: Tonelli-Shanks in F_{p^k}
+    # Write p^k - 1 = Q * 2^S (Q odd)
+    Q_ts, S = pk - 1, 0
+    while Q_ts % 2 == 0:
+        Q_ts //= 2
+        S += 1
+
+    # Find a quadratic non-residue w in F_{p^k}
+    euler = (pk - 1) // 2
+    w = None
+    for _ in range(10_000):
+        coeffs = [rng.randint(0, p - 1) for _ in range(k)]
+        if all(c == 0 for c in coeffs):
+            continue
+        candidate = ext_field.element(coeffs)
+        if candidate ** euler != one:
+            w = candidate
+            break
+    if w is None:
+        return None
+
+    # Standard Tonelli-Shanks iterations
+    M = S
+    c = w ** Q_ts       # non-residue raised to Q
+    t = z ** Q_ts       # z raised to Q
+    R = z ** ((Q_ts + 1) // 2)  # candidate sqrt
+
+    for _ in range(10_000):
+        if t == one:
+            return R if R * R == z else None
+        # Find least i > 0 such that t^{2^i} = 1
+        temp, i = t * t, 1
+        while temp != one and i < M:
+            temp = temp * temp
+            i += 1
+        if i == M:
+            return None  # z is not a QR (should not happen after Euler check)
+        # Update using b = c^{2^{M-i-1}}
+        b = c
+        for _ in range(M - i - 1):
+            b = b * b
+        M, c, t, R = i, b * b, t * c, R * b
+
+    return None
+
+
+def _is_in_base_field(Q: ExtCurvePoint) -> bool:
+    """Return True if Q's coordinates are all in F_p (constant polynomials).
+
+    A point with coordinates in F_p is actually in E(F_p), not genuinely in
+    E(F_{p^k}). Such a point gives a trivial Tate pairing and must be rejected.
+    """
+    if Q.is_infinity:
+        return True
+    def _is_constant(elem) -> bool:
+        # An element of F_{p^k} is in F_p iff all coefficients beyond degree 0 are zero
+        coeffs = elem.poly.coeffs
+        return all(c.value == 0 for c in coeffs[1:])
+    return _is_constant(Q.x) and _is_constant(Q.y)

@@ -132,12 +132,18 @@ def hash_to_point(message: str, curve: EllipticCurve, r: int) -> ECPoint:
     """
     # Step 1: Convert message to field element
     x = string_to_field_element(message, curve.field)
-    
-    # Step 2: Find a point on the curve
-    P_temp = increment_and_try(x, curve)
-    
-    # Step 3: Clear cofactor to get point of order r
+
     group_order = curve.group_order()
-    H_m = cofactor_clear(P_temp, group_order, r)
-    
-    return H_m
+
+    # Steps 2+3: find a point whose cofactor-cleared result is non-identity.
+    # increment_and_try already skips x values where z = x³+Ax+B has no sqrt.
+    # We also skip x values where cofactor_clear gives the identity — this
+    # happens when the found point's order divides the cofactor rather than r.
+    for _ in range(curve.field.p):
+        P_temp = increment_and_try(x, curve)
+        H_m    = cofactor_clear(P_temp, group_order, r)
+        if not H_m.is_infinity:
+            return H_m
+        x = x + curve.field.element(1)
+
+    raise RuntimeError("Could not find a non-identity hash point for this message")

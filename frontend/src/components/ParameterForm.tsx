@@ -4,9 +4,10 @@ import type { BLSRequest } from '../types/bls';
 interface ParameterFormProps {
   onSubmit: (params: BLSRequest) => void;
   loading: boolean;
+  elapsed: number;
 }
 
-export function ParameterForm({ onSubmit, loading }: ParameterFormProps) {
+export function ParameterForm({ onSubmit, loading, elapsed }: ParameterFormProps) {
   const [p, setP] = useState('103');
   const [A, setA] = useState('1');
   const [B, setB] = useState('0');
@@ -72,7 +73,7 @@ export function ParameterForm({ onSubmit, loading }: ParameterFormProps) {
           loading ? 'bg-slate-400 cursor-not-allowed' : 'bg-blue-600 cursor-pointer hover:bg-blue-700'
         }`}
       >
-        {loading ? 'Computing...' : 'Sign & Verify'}
+        {loading ? `Computing... ${elapsed}s` : 'Sign & Verify'}
       </button>
     </form>
   );
