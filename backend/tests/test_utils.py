@@ -81,6 +81,12 @@ class TestPrimeFactors:
         assert sorted(prime_factors(12)) == [2, 3]
         assert sorted(prime_factors(24)) == [2, 3]
 
+    def test_prime_factors_distinct_no_multiplicity(self):
+        # Contract: each prime appears exactly once regardless of multiplicity.
+        # 8 = 2^3, 72 = 2^3 * 3^2
+        assert prime_factors(8) == [2]
+        assert sorted(prime_factors(72)) == [2, 3]
+
     def test_prime_factors_prime(self):
         assert prime_factors(13) == [13]
         assert prime_factors(2) == [2]

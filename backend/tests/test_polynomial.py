@@ -99,6 +99,37 @@ class TestPolynomialArithmetic:
         assert g.is_monic()
         assert g.degree() == 1
 
+    def test_make_monic_non_monic(self, field):
+        # Regression: make_monic on a non-monic poly used to crash with
+        # TypeError because the leading FieldElement was passed back through
+        # field.element() (FieldElement % int is undefined).
+        # 2 + 4x  ->  divide by leading coeff 4  ->  (2/4) + x
+        p = Polynomial([field.element(2), field.element(4)], field)
+        monic = p.make_monic()
+        assert monic.is_monic()
+        assert monic.coeffs[1] == field.element(1)
+        assert monic.coeffs[0] == field.element(2) / field.element(4)
+
+    def test_make_monic_already_monic_is_identity(self, poly_x2_plus_1):
+        assert poly_x2_plus_1.make_monic() == poly_x2_plus_1
+
+    def test_make_monic_zero_polynomial(self, field):
+        zero = Polynomial([], field)
+        assert zero.make_monic() == zero
+
+    def test_gcd_non_monic_remainder(self, field):
+        # Regression: gcd ends with f.make_monic(); when the final remainder
+        # is non-monic this previously raised TypeError. Inputs are scaled so
+        # the common factor (x - 1) appears with a leading coeff != 1.
+        # 2x^2 - 2 = 2(x-1)(x+1),  3x - 3 = 3(x-1)
+        p = Polynomial([field.element(-2), field.element(0), field.element(2)], field)
+        q = Polynomial([field.element(-3), field.element(3)], field)
+        g = p.gcd(q)
+        assert g.is_monic()
+        assert g.degree() == 1
+        # monic gcd is x - 1
+        assert g == Polynomial([field.element(-1), field.element(1)], field)
+
     def test_eq(self, field):
         p = Polynomial([field.element(1), field.element(0)], field)
         q = Polynomial([field.element(1), field.element(0)], field)

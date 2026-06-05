@@ -276,7 +276,7 @@ class Polynomial:
     def make_monic(self) -> Polynomial:
         if self.is_monic() or not self.p:
             return self
-        return self / Polynomial([self.field.element(self.p[-1])], self.field)
+        return self / Polynomial([self.p[-1]], self.field)
 
     def gcd(self, other: Polynomial) -> Polynomial:
         """Compute GCD of two polynomials using Euclidean algorithm.

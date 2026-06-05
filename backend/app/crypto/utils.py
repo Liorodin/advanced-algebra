@@ -93,20 +93,21 @@ def is_prime(n: int) -> bool:
 
 
 def prime_factors(n: int) -> list[int]:
-    """Find all prime factors of n (with multiplicity).
+    """Find the distinct prime factors of n.
 
     Used by Rabin's irreducibility test which needs the distinct prime
-    factors of the polynomial degree k.
+    factors of the polynomial degree k. Each prime is listed once,
+    regardless of its multiplicity in n.
 
     Args:
         n: Positive integer to factorize.
 
     Returns:
-        List of prime factors (may contain duplicates).
+        List of distinct prime factors in ascending order.
 
     Examples:
         >>> prime_factors(12)
-        [2, 2, 3]
+        [2, 3]
         >>> prime_factors(13)
         [13]
     """
