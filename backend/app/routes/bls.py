@@ -25,6 +25,7 @@ async def run_bls(request: BLSRequest) -> BLSResponse:
             B=request.B,
             private_key=request.private_key,
             k=request.k,
+            seed=request.seed,
         )
         steps = scheme.get_steps(request.message)
         return BLSResponse(**steps)

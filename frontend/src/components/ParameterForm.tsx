@@ -14,6 +14,7 @@ export function ParameterForm({ onSubmit, loading, elapsed }: ParameterFormProps
   const [privateKey, setPrivateKey] = useState('7');
   const [message, setMessage] = useState('שלום');
   const [k, setK] = useState('');
+  const [seed, setSeed] = useState('42');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,6 +26,7 @@ export function ParameterForm({ onSubmit, loading, elapsed }: ParameterFormProps
       message,
     };
     if (k.trim() !== '') payload.k = parseInt(k, 10);
+    payload.seed = parseInt(seed, 10);
     onSubmit(payload);
   };
 
@@ -47,10 +49,14 @@ export function ParameterForm({ onSubmit, loading, elapsed }: ParameterFormProps
           <input className="w-full px-3 py-2 border border-slate-300 rounded-md text-[0.95rem]" type="number" value={B} onChange={e => setB(e.target.value)} required />
         </div>
       </div>
-      <div className="grid grid-cols-[1fr_1fr_2fr] gap-4 mb-5">
+      <div className="grid grid-cols-[1fr_1fr_1fr_2fr] gap-4 mb-5">
         <div>
           <label className="block mb-1 text-sm font-semibold text-slate-700">Private key (a)</label>
           <input className="w-full px-3 py-2 border border-slate-300 rounded-md text-[0.95rem]" type="number" value={privateKey} onChange={e => setPrivateKey(e.target.value)} required />
+        </div>
+        <div>
+          <label className="block mb-1 text-sm font-semibold text-slate-700">Seed</label>
+          <input className="w-full px-3 py-2 border border-slate-300 rounded-md text-[0.95rem]" type="number" value={seed} onChange={e => setSeed(e.target.value)} required />
         </div>
         <div>
           <label className="block mb-1 text-sm font-semibold text-slate-700">Embedding degree k</label>

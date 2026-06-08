@@ -44,7 +44,7 @@ class BLSSignatureScheme:
         public_key: aQ (ExtCurvePoint).
     """
 
-    def __init__(self, p: int, A: int, B: int, private_key: int, k: int | None = None) -> None:
+    def __init__(self, p: int, A: int, B: int, private_key: int, k: int | None = None, seed: int = 42) -> None:
         """Initialize the BLS signature scheme.
 
         Setup pipeline:
@@ -65,10 +65,14 @@ class BLSSignatureScheme:
             B: Curve parameter B.
             private_key: Secret key integer a.
             k: Optional embedding degree. Auto-computed if None.
+            seed: RNG seed for irreducible polynomial and Q search. None = random.
 
         Raises:
             ValueError: If parameters are invalid.
         """
+        import random
+        rng = random.Random(seed)
+
         #requires 1 < a < p-1
         if not (1 < private_key < p - 1):
             raise ValueError(f"Private key must satisfy 1 < a < p-1, got {private_key}")
@@ -99,13 +103,13 @@ class BLSSignatureScheme:
             self.k = ExtensionField.find_embedding_degree(p, self.r)
         
         # Step 7: Find irreducible polynomial
-        irr_poly = ExtensionField.find_irreducible(self.field, self.k)
-        
+        irr_poly = ExtensionField.find_irreducible(self.field, self.k, rng=rng)
+
         # Step 8: Create extension field
         self.ext_field = ExtensionField(self.field, irr_poly)
-        
+
         # Step 9: Find point Q of order r in E(F_{p^k})
-        self.Q = find_point_of_order_r(self.curve, self.ext_field, self.r)
+        self.Q = find_point_of_order_r(self.curve, self.ext_field, self.r, rng=rng)
         
         # Step 10: Store private key and compute public key
         self.private_key = private_key

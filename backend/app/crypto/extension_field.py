@@ -68,30 +68,28 @@ class ExtensionField:
         return ExtFieldElement(poly, self)
 
     @staticmethod
-    def find_irreducible(base_field: PrimeField, k: int) -> Polynomial:
+    def find_irreducible(base_field: PrimeField, k: int, rng=None) -> Polynomial:
         """Find a monic irreducible polynomial of degree k over F_p using randomized search."""
         from app.crypto.polynomial import Polynomial
         import random
-        
-        # Special case: k=2 and p ≡ 3 (mod 4) → x² + 1 is irreducible
+
+        # Special case: k=2 and p ≡ 3 (mod 4) → x² + 1 is always irreducible
         if k == 2 and base_field.p % 4 == 3:
             coeffs = [base_field.element(1), base_field.element(0), base_field.element(1)]
             return Polynomial(coeffs, base_field)
-        
-        p = base_field.p
+
+        p   = base_field.p
         one = base_field.element(1)
-        max_attempts = 1000  # הגבלת ביטחון כדי למנוע לולאה אינסופית במקרה של שגיאה
-        
-        for _ in range(max_attempts):
-            # הגרלת מקדמים אקראיים עבור x^0 עד x^{k-1}
-            coeffs = [base_field.element(random.randint(0, p - 1)) for _ in range(k)]
-            coeffs.append(one)  # הפיכת הפולינום למתוקן (monic) על ידי קביעת המקדם המוביל כ-1
-            
+        _rng = rng if rng is not None else random.Random()
+
+        for _ in range(1000):
+            coeffs = [base_field.element(_rng.randint(0, p - 1)) for _ in range(k)]
+            coeffs.append(one)
             poly = Polynomial(coeffs, base_field)
             if poly.is_irreducible(k):
                 return poly
-        
-        raise RuntimeError(f"Could not find irreducible polynomial of degree {k} over F_{p} after {max_attempts} attempts")
+
+        raise RuntimeError(f"Could not find irreducible polynomial of degree {k} over F_{p}")
 
     @staticmethod
     def find_embedding_degree(p: int, r: int) -> int:

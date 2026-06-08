@@ -163,6 +163,7 @@ def find_point_of_order_r(
     curve: EllipticCurve,
     ext_field: ExtensionField,
     r: int,
+    rng=None,
 ) -> ExtCurvePoint:
     """Find a point Q in E(F_{p^k}) of order r that is NOT in E(F_p).
 
@@ -207,7 +208,7 @@ def find_point_of_order_r(
     # Hasse bound: |E(F_{p^k})| lies within 2√(p^k) of p^k + 1
     hasse = int(2 * math.isqrt(pk)) + 2
 
-    rng = random.Random(42)
+    rng = rng if rng is not None else random.Random()
 
     for attempt in range(50_000):
         # Pick x with all k coefficients, ensuring at least one higher-degree
