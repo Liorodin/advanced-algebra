@@ -10,7 +10,6 @@ All arithmetic operations return new FieldElement instances (immutability).
 from __future__ import annotations
 from app.crypto.utils import is_prime, extended_gcd
 
-
 class PrimeField:
     """Represents the finite field F_p = Z/pZ.
 

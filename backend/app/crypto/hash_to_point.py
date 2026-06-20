@@ -39,10 +39,17 @@ def string_to_field_element(message: str, field: PrimeField) -> FieldElement:
     Example:
         "שלום" in UTF-8 → bytes → big integer → mod p
     """
-    raise NotImplementedError(
-        "string_to_field_element: Encode message as UTF-8 bytes, interpret as "
-        "base-256 integer, reduce mod p"
-    )
+   # 1. Encode message as Windows-1255 bytes per assignment instructions
+    message_bytes = message.encode('windows-1255')
+    
+    # 2. Convert to big integer (base-256) using Big-Endian formulation
+    value = 0
+    n = len(message_bytes)
+    for i, byte in enumerate(message_bytes):
+        value += byte * (256 ** (n - 1 - i))
+    
+    # 3. Reduce modulo p
+    return field.element(value % field.p)
 
 
 def increment_and_try(x: FieldElement, curve: EllipticCurve) -> ECPoint:
@@ -64,10 +71,26 @@ def increment_and_try(x: FieldElement, curve: EllipticCurve) -> ECPoint:
     Raises:
         RuntimeError: If no valid point found (shouldn't happen for large enough p).
     """
-    raise NotImplementedError(
-        "increment_and_try: Iterate x, x+1, ... Check if x³+Ax+B is QR, "
-        "if so compute sqrt and return point"
-    )
+    from app.crypto.elliptic_curve import ECPoint
+    
+    field = curve.field
+    max_attempts = field.p  # Try all possibilities if needed
+    
+    for _ in range(max_attempts):
+        # Compute z = x³ + Ax + B
+        z = x**3 + curve.A * x + curve.B
+        
+        # Check if z is a quadratic residue
+        if z.is_quadratic_residue():
+            # Compute y = sqrt(z)
+            # For p ≡ 3 (mod 4), y = z^((p+1)/4)
+            y = z.sqrt()
+            return ECPoint(curve, x, y)
+        
+        # Try next x
+        x = x + field.element(1)
+    
+    raise RuntimeError(f"Could not find valid point after {max_attempts} attempts")
 
 
 def cofactor_clear(point: ECPoint, group_order: int, r: int) -> ECPoint:
@@ -84,9 +107,8 @@ def cofactor_clear(point: ECPoint, group_order: int, r: int) -> ECPoint:
     Returns:
         An ECPoint of order dividing r (ideally exactly r).
     """
-    raise NotImplementedError(
-        "cofactor_clear: Return (group_order // r) * point"
-    )
+    cofactor = group_order // r
+    return cofactor * point
 
 
 def hash_to_point(message: str, curve: EllipticCurve, r: int) -> ECPoint:
@@ -108,6 +130,20 @@ def hash_to_point(message: str, curve: EllipticCurve, r: int) -> ECPoint:
     Example:
         For p=103, A=1, B=0, message="שלום": H(m) = (32, 47)
     """
-    raise NotImplementedError(
-        "hash_to_point: Chain string_to_field_element → increment_and_try → cofactor_clear"
-    )
+    # Step 1: Convert message to field element
+    x = string_to_field_element(message, curve.field)
+
+    group_order = curve.group_order()
+
+    # Steps 2+3: find a point whose cofactor-cleared result is non-identity.
+    # increment_and_try already skips x values where z = x³+Ax+B has no sqrt.
+    # We also skip x values where cofactor_clear gives the identity — this
+    # happens when the found point's order divides the cofactor rather than r.
+    for _ in range(curve.field.p):
+        P_temp = increment_and_try(x, curve)
+        H_m    = cofactor_clear(P_temp, group_order, r)
+        if not H_m.is_infinity:
+            return H_m
+        x = x + curve.field.element(1)
+
+    raise RuntimeError("Could not find a non-identity hash point for this message")

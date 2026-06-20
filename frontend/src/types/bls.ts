@@ -11,6 +11,8 @@ export interface BLSRequest {
   B: number;
   private_key: number;
   message: string;
+  k?: number;    // optional embedding degree; omit to auto-compute
+  seed?: number; // RNG seed (default 42)
 }
 
 /** Response from the BLS signature pipeline with all intermediate steps. */

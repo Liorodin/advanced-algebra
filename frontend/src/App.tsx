@@ -6,11 +6,11 @@ import { ErrorAlert } from './components/ErrorAlert';
 import { useBLS } from './hooks/useBLS';
 
 function App() {
-  const { result, error, loading, execute, clear } = useBLS();
+  const { result, error, loading, elapsed, execute, clear } = useBLS();
 
   return (
     <Layout>
-      <ParameterForm onSubmit={execute} loading={loading} />
+      <ParameterForm onSubmit={execute} loading={loading} elapsed={elapsed} />
       {error && <ErrorAlert message={error} onDismiss={clear} />}
       {result && (
         <>

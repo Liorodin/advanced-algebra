@@ -24,6 +24,8 @@ class BLSRequest(BaseModel):
     B: int = Field(..., description="Elliptic curve coefficient B")
     private_key: int = Field(..., description="Private key (secret integer a)")
     message: str = Field(..., description="Message to sign")
+    k: int | None = Field(None, description="Embedding degree (auto-computed if omitted, must be > 1 and satisfy r | p^k - 1)")
+    seed: int = Field(42, description="RNG seed for irreducible polynomial and Q search (default 42)")
 
 
 class BLSResponse(BaseModel):
